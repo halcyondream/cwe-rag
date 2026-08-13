@@ -1,12 +1,12 @@
 import os
 import json
 import xmltodict
-from time import sleep
 import csv
 from dotenv import load_dotenv
 import os
 from pathlib import Path
 import requests
+from zipfile import ZipFile
 
 load_dotenv()
 
@@ -15,14 +15,45 @@ IGNORE_DISCOURAGED = os.environ.get("IGNORE_DISCOURAGED") or False
 output_folder = Path(os.environ.get("OUTPUT_FOLDER"))
 cache_folder = Path("./cache")
 
+if not output_folder.exists():
+    output_folder.mkdir()
 
-def get_cwe_xml():
+
+def cache_file_from_url(url, target_path):
+    resp = requests.get(url)
+    resp.raise_for_status()
+
+    with open(target_path, "wb") as f:
+        for chunk in resp.iter_content(chunk_size=8192):
+            f.write(chunk)    
+
+
+def get_cwe_xml(force_update=False):
+    """
+    Fetch the current CWE catalog. This is assumed to be a zipfile containing
+    one XML file in the format of `cwec_vX.YY.xml`. If this assumption changes
+    (for example, multiple versions in one zipfile), update the code.
+    """
+    target_path = cache_folder / "cwe.zip"
+
+    # Only fetch the zipfile if it doesn't exist or if fetching is forced.
+    if force_update or not target_path.exists():
+        cache_file_from_url("https://cwe.mitre.org/data/xml/cwec_latest.xml.zip", target_path)
+    
     url = "https://cwe.mitre.org/data/xml/cwec_latest.xml.zip"
     resp = requests.get(url)
     resp.raise_for_status()
-    with open(cache_folder / "cwe.zip", "wb") as f:
+
+    with open(target_path, "wb") as f:
         for chunk in resp.iter_content(chunk_size=8192):
             f.write(chunk)
+    
+    with ZipFile(target_path) as z:
+        z.extractall(cache_folder)
+
+    xmls = [f.absolute() for f in cache_folder.rglob("cwec**.xml")]
+    assert len(xmls) == 1
+    return xmls[0]
 
 
 def iter_values(obj) -> list[str]:
@@ -59,9 +90,9 @@ def load_capec_map(filename) -> dict:
 
 flatten = lambda x: "".join([line.strip() for line in x.split("\n")])
 
-capec_map = load_capec_map("capec.csv")
+cwe_file = get_cwe_xml()
 
-with open("cwec_v4.20.xml") as f:
+with open(cwe_file) as f:
     cwe_xml = f.read()
 
 cwe_json_all = xmltodict.parse(cwe_xml).get("Weakness_Catalog").get("Weaknesses")
@@ -73,7 +104,7 @@ all_weaknesses = [
     for weakness in cwe_json_all.get("Weakness")
 ]
 
-for idx, cwe_json in enumerate(all_weaknesses):
+for idx, cwe_json in enumerate(all_weaknesses): 
     clean_str = lambda string: " ".join([s.strip() for s in string.split("\n")])
 
     cwe_id = int(cwe_json["@ID"])
@@ -103,10 +134,7 @@ for idx, cwe_json in enumerate(all_weaknesses):
     if len(capecs) > 0:
         for id in iter_values(capecs.get("Related_Attack_Pattern")):
             capec_id = int(id)
-            capec_description = capec_map[id]
-            related_capecs.append(
-                {"capec_id": capec_id, "capec_description": capec_description}
-            )
+            related_capecs.append(capec_id)
 
     cves = cwe_json.get("Observed_Examples", [])
     related_cves = []
@@ -158,6 +186,9 @@ for idx, cwe_json in enumerate(all_weaknesses):
 
 
     def handle_platform_collection(platform_info: dict, name: str, not_key: str):
+        """
+        Normalize some of the messy XML structure.
+        """
         not_string = f"Not {not_key}-Specific"
         collection: list = iter_values(platform_info.get(name, []))
         ignore_terms = ["unknown", "undetermined", "often"]
