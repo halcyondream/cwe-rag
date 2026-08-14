@@ -4,3 +4,4 @@ cache/
 cwes-extracted/
 chroma/
 cwes-md/
+__pycache__/
