@@ -32,7 +32,16 @@ collection: Collection = client.get_or_create_collection(
 splitter = RecursiveCharacterTextSplitter.from_language(language=Language.MARKDOWN)
 
 
-def extract_topmatter(text):
+def extract_markdown(text: str) -> tuple[dict, str]:
+    """
+    Extracts a two-tuple of (topmatter, markdown,)
+
+    Args:
+        text(str): The markdown file
+
+    Returns:
+        (topmatter: dict, markdown: str,): A two-tuple of the file's contents
+    """
     lines = text.splitlines(keepends=True)
     if not lines or lines[0].rstrip("\r\n") != "---":
         return {}, text
@@ -88,7 +97,7 @@ for doc_idx, cwe_file in enumerate(md_files):
 
     with open(cwe_file) as f:
         content = f.read()
-        topmatter, cwe_md = extract_topmatter(content)
+        topmatter, cwe_md = extract_markdown(content)
     cwe_id = topmatter["id"]
     cwe_name = topmatter["name"]
     cwe_abstraction = topmatter["abstraction"]
