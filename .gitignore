@@ -2,3 +2,5 @@ venv/
 cache/
 .env
 cwes-extracted/
+chroma/
+cwes-md/

@@ -173,6 +173,30 @@ for idx, cwe_json in enumerate(all_weaknesses):
     # newlines/indentation.
     xml_unparse = lambda xml_json: xmltodict.unparse(xml_json, full_document=False)
 
+
+
+    def parse_consequences(cwe_json):
+        get_json = lambda data: {
+            "scope": data.get("Scope") or "",
+            "impact": data.get("Impact") or "",
+            "note": "\n".join(iter_values(data.get("Note"))) or ""
+        }
+        cwe_consequences = cwe_json.get("Common_Consequences")
+        if not cwe_consequences:
+            return []
+        consequence = cwe_consequences["Consequence"]
+        if type(consequence) == dict:
+            return [get_json(consequence)]
+        elif type(consequence) == list:
+            ret = []
+            for c in consequence:
+                ret.append(get_json(c))
+            return ret
+        raise TypeError(f"Expected a dict or list, got {type(consequence)}")
+
+
+    consequences = parse_consequences(cwe_json)
+
     cwe_platforms = xml_get(cwe_json, "Applicable_Platforms")
     cwe_description = xml_get(cwe_json, "Description")
     cwe_extended_description = "\n".join(
@@ -237,10 +261,12 @@ for idx, cwe_json in enumerate(all_weaknesses):
         "mapping": cwe_mapping,
         "abstraction": cwe_abstraction,
         "description": "\n\n".join(iter_values(cwe_description)),
+        "extended_description": "\n\n".join(iter_values(cwe_extended_description)),
         "background": "\n\n".join(iter_values(cwe_background)),
         "cves": related_cves,
         "capecs": related_capecs,
         "platform_info": cwe_platform_metadata,
+        "consequences": consequences
     }
 
     with open(output_folder / f"cwe-{cwe_id}.json", "w") as f:
