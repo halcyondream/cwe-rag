@@ -1,210 +1,223 @@
 import os
 import json
 import xmltodict
-import csv
 from dotenv import load_dotenv
 import os
 from pathlib import Path
-import requests
 from zipfile import ZipFile
+from common import iter_values, cache_file_from_url
 
 load_dotenv()
 
-IGNORE_PROHIBITED = os.environ.get("IGNORE_PROHIBITED") or False
-IGNORE_DISCOURAGED = os.environ.get("IGNORE_DISCOURAGED") or False
-output_folder = Path(os.environ.get("OUTPUT_FOLDER"))
-cache_folder = Path("./cache")
 
-if not output_folder.exists():
-    output_folder.mkdir()
-
-
-def cache_file_from_url(url, target_path):
-    resp = requests.get(url)
-    resp.raise_for_status()
-
-    with open(target_path, "wb") as f:
-        for chunk in resp.iter_content(chunk_size=8192):
-            f.write(chunk)
-
-
-def get_cwe_xml(force_update=False):
+class CweXmlExtractor:
     """
-    Fetch the current CWE catalog. This is assumed to be a zipfile containing
-    one XML file in the format of `cwec_vX.YY.xml`. If this assumption changes
-    (for example, multiple versions in one zipfile), update the code.
-    """
-    target_path = cache_folder / "cwe.zip"
+    Download and extract CWE data as a JSON intermediate representation.
 
-    # Only fetch the zipfile if it doesn't exist or if fetching is forced.
-    if force_update or not target_path.exists():
-        cache_file_from_url(
-            "https://cwe.mitre.org/data/xml/cwec_latest.xml.zip", target_path
+    This project distinguishes the JSON transformation from the vector db
+    markdown form. The outputs here pipe directly into what you get with the
+    markdown files, including content and topmatter.
+
+    Alternatively, if you just want the JSON, this is the class you care about.
+    """
+
+    def __init__(self):
+        self.ignore_prohibited = os.environ.get("IGNORE_PROHIBITED") or False
+        self.ignore_discouraged = os.environ.get("IGNORE_DISCOURAGED") or False
+        self.output_folder = Path(os.environ.get("OUTPUT_FOLDER"))
+        self.cache_folder = Path("./cache")
+        self.cwe_xml = None
+
+        if not self.cache_folder.exists():
+            self.output_folder.mkdir()
+
+        if not self.output_folder.exists():
+            self.output_folder.mkdir()
+
+    def extract(self):
+        """
+        Extract all CWEs and rewrite them in a normalized JSON form.
+        """
+        cwe_file = self._pull()
+
+        with open(cwe_file) as f:
+            cwe_xml = f.read()
+
+        cwe_json_all = (
+            xmltodict.parse(cwe_xml).get("Weakness_Catalog").get("Weaknesses")
+        )
+        self.preexisting_extractions = self.output_folder.rglob("cwe**.json")
+        self.all_weaknesses = [weakness for weakness in cwe_json_all.get("Weakness")]
+
+        for idx, cwe_json in enumerate(self.all_weaknesses):
+            self._process_cwe(cwe_json, idx)
+
+    def print_stats(self):
+        cached = list(self.cache_folder.rglob("cwec**.xml"))
+        extracted = list(self.output_folder.rglob("cwe**.json"))
+        print(f"Extracted: {len(extracted)} file(s)")
+        print(f"Cached: {len(cached)} file(s)")
+
+    def clear_cache(self):
+        for file in self.cache_folder.iterdir():
+            file.unlink()
+
+    def clear_files(self):
+        for file in self.output_folder.iterdir():
+            file.unlink()
+
+    def clear_all(self):
+        self.clear_cache()
+        self.clear_files()
+
+    def _pull(self, force_update=False):
+        """
+        Fetch the current CWE catalog. This is assumed to be a zipfile containing
+        one XML file in the format of `cwec_vX.YY.xml`. If this assumption changes
+        (for example, multiple versions in one zipfile), update the code.
+        """
+        target_path = self.cache_folder / "cwe.zip"
+
+        # Only fetch the zipfile if it doesn't exist or if fetching is forced.
+        if force_update or not target_path.exists():
+            cache_file_from_url(
+                "https://cwe.mitre.org/data/xml/cwec_latest.xml.zip", target_path
+            )
+
+        with ZipFile(target_path) as z:
+            z.extractall(self.cache_folder)
+
+        xmls = [f.absolute() for f in self.cache_folder.rglob("cwec**.xml")]
+        assert len(xmls) == 1
+        return xmls[0]
+
+    def _process_cwe(self, cwe_json, idx):
+        """
+        Extract a single CWE to JSON and cache it to a file.
+        """
+        clean_str = lambda string: " ".join([s.strip() for s in string.split("\n")])
+
+        cwe_id = int(cwe_json["@ID"])
+        cwe_name = cwe_json["@Name"]
+        cwe_mapping = cwe_json["Mapping_Notes"]["Usage"]
+        cwe_abstraction = cwe_json["@Abstraction"].lower()
+
+        print(
+            f"\n[{round((idx/len(self.all_weaknesses))*100)}% | {idx+1}/{len(self.all_weaknesses)}] CWE-{cwe_id}: {cwe_name}\n"
         )
 
-    url = "https://cwe.mitre.org/data/xml/cwec_latest.xml.zip"
-    resp = requests.get(url)
-    resp.raise_for_status()
+        if f"cwe-{cwe_id}.json" in self.preexisting_extractions:
+            print("  [CWE already processed. Ignoring...]")
+            return
 
-    with open(target_path, "wb") as f:
-        for chunk in resp.iter_content(chunk_size=8192):
-            f.write(chunk)
+        if self.ignore_prohibited and cwe_mapping.lower() == "prohibited":
+            print("  [CWE mapping is PROHIBITED. Ignoring...]")
+            return
 
-    with ZipFile(target_path) as z:
-        z.extractall(cache_folder)
+        if self.ignore_discouraged and cwe_mapping.lower() == "discouraged":
+            print("  [CWE mapping is DISCOURAGED. Ignoring...]")
+            return
 
-    xmls = [f.absolute() for f in cache_folder.rglob("cwec**.xml")]
-    assert len(xmls) == 1
-    return xmls[0]
+        capecs = cwe_json.get("Related_Attack_Patterns", [])
+        related_capecs = []
 
+        if len(capecs) > 0:
+            for id in iter_values(capecs.get("Related_Attack_Pattern")):
+                capec_id = int(id)
+                related_capecs.append(capec_id)
 
-def iter_values(obj) -> list[str]:
-    """Return a list of all non-null values in a dict. Omits keys entirely.
-    TODO: Rename this function lol."""
+        cves = cwe_json.get("Observed_Examples", [])
+        related_cves = []
 
-    def _deep_extract(obj):
-        """Helper method to perform a deep extract of all values in a dict."""
-        if isinstance(obj, dict):
-            for value in obj.values():
-                yield from iter_values(value)
-        elif isinstance(obj, list):
-            for item in obj:
-                yield from iter_values(item)
-        else:
-            yield obj
+        if len(cves) > 0:
+            cve_instance = []
+            cve_data = cves["Observed_Example"]
 
-    # Return non-null items.
-    return [str(e) for e in list(_deep_extract(obj)) if e]
+            # Handles an edge case in the XML-to-dict process where
+            # the CVE is either an object or a list of objects.
+            if type(cve_data) == dict:
+                cve_instance.append(cve_data)
+            elif type(cve_data) == list:
+                cve_instance += cve_data
+            for cve in cve_instance:
+                cve_id = cve["Reference"]
+                cve_description = clean_str(cve["Description"])
+                related_cves.append(
+                    {"cve_id": cve_id, "cve_description": cve_description}
+                )
 
+        omissions = [
+            "References",
+            "Mapping_Notes",
+            "Content_History",
+            "Modes_Of_Introduction",
+        ]
 
-def load_capec_map(filename) -> dict:
-    """Return a `{capec-id: title}` lookup table."""
-    mappings = {}
+        for key in omissions:
+            if cwe_json.get(key):
+                del cwe_json[key]
 
-    with open(filename) as f:
-        for line in csv.reader(f):
-            id = line[0]
-            description = line[1]
-            mappings[id] = description
+        # Returns either the list or an empty set with the same key name.
+        # Intended to preserve structure for unparsing later.
+        xml_get = lambda xml_json, key: xml_json.get(key, {key: []})
 
-    return mappings
+        consequences = self._parse_consequences(cwe_json)
 
+        cwe_platforms = xml_get(cwe_json, "Applicable_Platforms")
+        cwe_description = xml_get(cwe_json, "Description")
+        cwe_extended_description = "\n".join(
+            iter_values(xml_get(cwe_json, "Extended_Description"))
+        )
+        cwe_background = xml_get(cwe_json, "Background_Details")
+        cwe_alt_terms = xml_get(cwe_json, "Alternate_Terms")
 
-flatten = lambda x: "".join([line.strip() for line in x.split("\n")])
+        cwe_description = clean_str(cwe_description)
+        cwe_extended_description = clean_str(cwe_extended_description)
 
-cwe_file = get_cwe_xml()
+        cwe_languages, cwe_is_language_specific = self._handle_platform_collection(
+            cwe_platforms, "Languages", "Language"
+        )
+        cwe_operating_systems, cwe_is_os_specific = self._handle_platform_collection(
+            cwe_platforms, "Operating_System", "OS"
+        )
+        cwe_architectures, cwe_is_architecture_specific = (
+            self._handle_platform_collection(
+                cwe_platforms, "Architecture", "Architecture"
+            )
+        )
+        cwe_technologies, cwe_is_technology_specific = self._handle_platform_collection(
+            cwe_platforms, "Technology", "Technology"
+        )
 
-with open(cwe_file) as f:
-    cwe_xml = f.read()
-
-cwe_json_all = xmltodict.parse(cwe_xml).get("Weakness_Catalog").get("Weaknesses")
-
-preexisting_extractions = os.listdir(output_folder)
-
-all_weaknesses = [weakness for weakness in cwe_json_all.get("Weakness")]
-
-for idx, cwe_json in enumerate(all_weaknesses):
-    clean_str = lambda string: " ".join([s.strip() for s in string.split("\n")])
-
-    cwe_id = int(cwe_json["@ID"])
-    cwe_name = cwe_json["@Name"]
-    cwe_mapping = cwe_json["Mapping_Notes"]["Usage"]
-    cwe_abstraction = cwe_json["@Abstraction"].lower()
-
-    print(
-        f"\n[{round((idx/len(all_weaknesses))*100)}% | {idx+1}/{len(all_weaknesses)}] CWE-{cwe_id}: {cwe_name}\n"
-    )
-
-    if f"cwe-{cwe_id}.json" in preexisting_extractions:
-        print("  [CWE already processed. Ignoring...]")
-        continue
-
-    if IGNORE_PROHIBITED and cwe_mapping.lower() == "prohibited":
-        print("  [CWE mapping is PROHIBITED. Ignoring...]")
-        continue
-
-    if IGNORE_DISCOURAGED and cwe_mapping.lower() == "discouraged":
-        print("  [CWE mapping is DISCOURAGED. Ignoring...]")
-        continue
-
-    capecs = cwe_json.get("Related_Attack_Patterns", [])
-    related_capecs = []
-
-    if len(capecs) > 0:
-        for id in iter_values(capecs.get("Related_Attack_Pattern")):
-            capec_id = int(id)
-            related_capecs.append(capec_id)
-
-    cves = cwe_json.get("Observed_Examples", [])
-    related_cves = []
-
-    if len(cves) > 0:
-        cve_instance = []
-        cve_data = cves["Observed_Example"]
-
-        # Handles an edge case in the XML-to-dict process where
-        # the CVE is either an object or a list of objects.
-        if type(cve_data) == dict:
-            cve_instance.append(cve_data)
-        elif type(cve_data) == list:
-            cve_instance += cve_data
-        for cve in cve_instance:
-            cve_id = cve["Reference"]
-            cve_description = clean_str(cve["Description"])
-            related_cves.append({"cve_id": cve_id, "cve_description": cve_description})
-
-    omissions = [
-        "References",
-        "Mapping_Notes",
-        "Content_History",
-        "Modes_Of_Introduction",
-    ]
-
-    for key in omissions:
-        if cwe_json.get(key):
-            del cwe_json[key]
-
-    # Returns either the list or an empty set with the same key name.
-    # Intended to preserve structure for unparsing later.
-    xml_get = lambda xml_json, key: xml_json.get(key, {key: []})
-
-    # Convert a dict back to XML. Omits the <?xml > header and flattens
-    # newlines/indentation.
-    xml_unparse = lambda xml_json: xmltodict.unparse(xml_json, full_document=False)
-
-    def parse_consequences(cwe_json):
-        get_json = lambda data: {
-            "scope": data.get("Scope") or "",
-            "impact": data.get("Impact") or "",
-            "note": "\n".join(iter_values(data.get("Note"))) or "",
+        cwe_platform_metadata = {
+            "languages": cwe_languages,
+            "is_language_specific": cwe_is_language_specific,
+            "operating_systems": cwe_operating_systems,
+            "is_os_specific": cwe_is_os_specific,
+            "technologies": cwe_technologies,
+            "is_technology_specific": cwe_is_technology_specific,
+            "architectures": cwe_architectures,
+            "is_architecture_specific": cwe_is_architecture_specific,
         }
-        cwe_consequences = cwe_json.get("Common_Consequences")
-        if not cwe_consequences:
-            return []
-        consequence = cwe_consequences["Consequence"]
-        if type(consequence) == dict:
-            return [get_json(consequence)]
-        elif type(consequence) == list:
-            ret = []
-            for c in consequence:
-                ret.append(get_json(c))
-            return ret
-        raise TypeError(f"Expected a dict or list, got {type(consequence)}")
 
-    consequences = parse_consequences(cwe_json)
+        cwe_metadata = {
+            "id": cwe_id,
+            "name": cwe_name,
+            "mapping": cwe_mapping,
+            "abstraction": cwe_abstraction,
+            "description": "\n\n".join(iter_values(cwe_description)),
+            "extended_description": "\n\n".join(iter_values(cwe_extended_description)),
+            "background": "\n\n".join(iter_values(cwe_background)),
+            "cves": related_cves,
+            "capecs": related_capecs,
+            "platform_info": cwe_platform_metadata,
+            "consequences": consequences,
+        }
 
-    cwe_platforms = xml_get(cwe_json, "Applicable_Platforms")
-    cwe_description = xml_get(cwe_json, "Description")
-    cwe_extended_description = "\n".join(
-        iter_values(xml_get(cwe_json, "Extended_Description"))
-    )
-    cwe_background = xml_get(cwe_json, "Background_Details")
-    cwe_alt_terms = xml_get(cwe_json, "Alternate_Terms")
+        with open(self.output_folder / f"cwe-{cwe_id}.json", "w") as f:
+            f.write(json.dumps(cwe_metadata, indent=2))
 
-    cwe_description = clean_str(cwe_description)
-    cwe_extended_description = clean_str(cwe_extended_description)
-
-    def handle_platform_collection(platform_info: dict, name: str, not_key: str):
+    def _handle_platform_collection(self, platform_info: dict, name: str, not_key: str):
         """
         Normalize some of the messy XML structure.
         """
@@ -216,64 +229,49 @@ for idx, cwe_json in enumerate(all_weaknesses):
         # pluralized version first.
         try_1 = platform_info.get(name, [])
         try_2 = platform_info.get(not_key, [])
+
         if len(try_1):
             collection: list = iter_values(try_1)
         elif len(try_2):
             collection: list = iter_values(try_2)
         else:
             collection = []
+
         ignore_terms = ["unknown", "undetermined", "often"]
         collection = [e for e in collection if e.lower() not in ignore_terms]
         is_specific = not_string not in collection and len(collection) > 0
         collection = [e for e in collection if e != not_string]
         return collection, is_specific
 
-    cwe_languages, cwe_is_language_specific = handle_platform_collection(
-        cwe_platforms, "Languages", "Language"
-    )
-    cwe_operating_systems, cwe_is_os_specific = handle_platform_collection(
-        cwe_platforms, "Operating_System", "OS"
-    )
-    cwe_architectures, cwe_is_architecture_specific = handle_platform_collection(
-        cwe_platforms, "Architecture", "Architecture"
-    )
-    cwe_technologies, cwe_is_technology_specific = handle_platform_collection(
-        cwe_platforms, "Technology", "Technology"
-    )
-
-    cwe_platform_metadata = {
-        "languages": cwe_languages,
-        "is_language_specific": cwe_is_language_specific,
-        "operating_systems": cwe_operating_systems,
-        "is_os_specific": cwe_is_os_specific,
-        "technologies": cwe_technologies,
-        "is_technology_specific": cwe_is_technology_specific,
-        "architectures": cwe_architectures,
-        "is_architecture_specific": cwe_is_architecture_specific,
-    }
-
-    cwe_trimmed = {
-        "Weakness_Trimmed": {
-            "Applicable_Platforms": cwe_platforms,
-            "Description": cwe_description,
-            "Background_Details": cwe_background,
-            "Alternate_Terms": cwe_alt_terms,
+    def _parse_consequences(self, cwe_json):
+        """
+        Normalize a CWE's consequences into intuitive scope, impact, and notes.
+        """
+        get_json = lambda data: {
+            "scope": data.get("Scope") or "",
+            "impact": data.get("Impact") or "",
+            "note": "\n".join(iter_values(data.get("Note"))) or "",
         }
-    }
 
-    cwe_metadata = {
-        "id": cwe_id,
-        "name": cwe_name,
-        "mapping": cwe_mapping,
-        "abstraction": cwe_abstraction,
-        "description": "\n\n".join(iter_values(cwe_description)),
-        "extended_description": "\n\n".join(iter_values(cwe_extended_description)),
-        "background": "\n\n".join(iter_values(cwe_background)),
-        "cves": related_cves,
-        "capecs": related_capecs,
-        "platform_info": cwe_platform_metadata,
-        "consequences": consequences,
-    }
+        cwe_consequences = cwe_json.get("Common_Consequences")
 
-    with open(output_folder / f"cwe-{cwe_id}.json", "w") as f:
-        f.write(json.dumps(cwe_metadata, indent=2))
+        if not cwe_consequences:
+            return []
+
+        consequence = cwe_consequences["Consequence"]
+
+        if type(consequence) == dict:
+            return [get_json(consequence)]
+        elif type(consequence) == list:
+            ret = []
+            for c in consequence:
+                ret.append(get_json(c))
+            return ret
+
+        raise TypeError(f"Expected a dict or list, got {type(consequence)}")
+
+
+if __name__ == "__main__":
+    extractor = CweXmlExtractor()
+    extractor.extract()
+    extractor.print_stats()
