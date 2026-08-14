@@ -25,7 +25,7 @@ def cache_file_from_url(url, target_path):
 
     with open(target_path, "wb") as f:
         for chunk in resp.iter_content(chunk_size=8192):
-            f.write(chunk)    
+            f.write(chunk)
 
 
 def get_cwe_xml(force_update=False):
@@ -38,8 +38,10 @@ def get_cwe_xml(force_update=False):
 
     # Only fetch the zipfile if it doesn't exist or if fetching is forced.
     if force_update or not target_path.exists():
-        cache_file_from_url("https://cwe.mitre.org/data/xml/cwec_latest.xml.zip", target_path)
-    
+        cache_file_from_url(
+            "https://cwe.mitre.org/data/xml/cwec_latest.xml.zip", target_path
+        )
+
     url = "https://cwe.mitre.org/data/xml/cwec_latest.xml.zip"
     resp = requests.get(url)
     resp.raise_for_status()
@@ -47,7 +49,7 @@ def get_cwe_xml(force_update=False):
     with open(target_path, "wb") as f:
         for chunk in resp.iter_content(chunk_size=8192):
             f.write(chunk)
-    
+
     with ZipFile(target_path) as z:
         z.extractall(cache_folder)
 
@@ -99,12 +101,9 @@ cwe_json_all = xmltodict.parse(cwe_xml).get("Weakness_Catalog").get("Weaknesses"
 
 preexisting_extractions = os.listdir(output_folder)
 
-all_weaknesses = [
-    weakness
-    for weakness in cwe_json_all.get("Weakness")
-]
+all_weaknesses = [weakness for weakness in cwe_json_all.get("Weakness")]
 
-for idx, cwe_json in enumerate(all_weaknesses): 
+for idx, cwe_json in enumerate(all_weaknesses):
     clean_str = lambda string: " ".join([s.strip() for s in string.split("\n")])
 
     cwe_id = int(cwe_json["@ID"])
@@ -113,12 +112,12 @@ for idx, cwe_json in enumerate(all_weaknesses):
     cwe_abstraction = cwe_json["@Abstraction"].lower()
 
     print(
-      f"\n[{round((idx/len(all_weaknesses))*100)}% | {idx+1}/{len(all_weaknesses)}] CWE-{cwe_id}: {cwe_name}\n"
+        f"\n[{round((idx/len(all_weaknesses))*100)}% | {idx+1}/{len(all_weaknesses)}] CWE-{cwe_id}: {cwe_name}\n"
     )
-    
+
     if f"cwe-{cwe_id}.json" in preexisting_extractions:
-      print("  [CWE already processed. Ignoring...]")
-      continue
+        print("  [CWE already processed. Ignoring...]")
+        continue
 
     if IGNORE_PROHIBITED and cwe_mapping.lower() == "prohibited":
         print("  [CWE mapping is PROHIBITED. Ignoring...]")
@@ -173,13 +172,11 @@ for idx, cwe_json in enumerate(all_weaknesses):
     # newlines/indentation.
     xml_unparse = lambda xml_json: xmltodict.unparse(xml_json, full_document=False)
 
-
-
     def parse_consequences(cwe_json):
         get_json = lambda data: {
             "scope": data.get("Scope") or "",
             "impact": data.get("Impact") or "",
-            "note": "\n".join(iter_values(data.get("Note"))) or ""
+            "note": "\n".join(iter_values(data.get("Note"))) or "",
         }
         cwe_consequences = cwe_json.get("Common_Consequences")
         if not cwe_consequences:
@@ -194,7 +191,6 @@ for idx, cwe_json in enumerate(all_weaknesses):
             return ret
         raise TypeError(f"Expected a dict or list, got {type(consequence)}")
 
-
     consequences = parse_consequences(cwe_json)
 
     cwe_platforms = xml_get(cwe_json, "Applicable_Platforms")
@@ -208,19 +204,29 @@ for idx, cwe_json in enumerate(all_weaknesses):
     cwe_description = clean_str(cwe_description)
     cwe_extended_description = clean_str(cwe_extended_description)
 
-
     def handle_platform_collection(platform_info: dict, name: str, not_key: str):
         """
         Normalize some of the messy XML structure.
         """
         not_string = f"Not {not_key}-Specific"
-        collection: list = iter_values(platform_info.get(name, []))
+
+        # Because the CWE XML is a bit messy, some keys are defined by their
+        # pluaralized form and others are not (ex, "Languages" vs "Language").
+        # Try both cases when determining whether a hit exists, preferring the
+        # pluralized version first.
+        try_1 = platform_info.get(name, [])
+        try_2 = platform_info.get(not_key, [])
+        if len(try_1):
+            collection: list = iter_values(try_1)
+        elif len(try_2):
+            collection: list = iter_values(try_2)
+        else:
+            collection = []
         ignore_terms = ["unknown", "undetermined", "often"]
         collection = [e for e in collection if e.lower() not in ignore_terms]
         is_specific = not_string not in collection and len(collection) > 0
         collection = [e for e in collection if e != not_string]
         return collection, is_specific
-
 
     cwe_languages, cwe_is_language_specific = handle_platform_collection(
         cwe_platforms, "Languages", "Language"
@@ -266,7 +272,7 @@ for idx, cwe_json in enumerate(all_weaknesses):
         "cves": related_cves,
         "capecs": related_capecs,
         "platform_info": cwe_platform_metadata,
-        "consequences": consequences
+        "consequences": consequences,
     }
 
     with open(output_folder / f"cwe-{cwe_id}.json", "w") as f:
