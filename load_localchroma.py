@@ -13,9 +13,11 @@ import os
 import yaml
 
 md_files = Path(os.environ.get("OUTPUT_FOLDER_MD")).rglob("cwe**.md")
+ollama_host = os.environ.get("OLLAMA_HOST")
+embedding_model = os.environ.get("EMBEDDING_MODEL")
 
 ollama_embedding_function = OllamaEmbeddingFunction(
-    url=os.environ.get("OLLAMA_HOST"), model_name="mxbai-embed-large"
+    url=ollama_host, model_name=embedding_model
 )
 
 client = chromadb.PersistentClient()
