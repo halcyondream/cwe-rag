@@ -43,10 +43,20 @@ class ConsequenceModel(BaseModel):
     a technical explanation of the impact, and optional notes.
     """
 
-    scope: Literal["Confidentiality", "Availability", "Integrity"] = Field(
-        description="The weakness' general impact scope"
-    )
-    impact: str = Field(
+    scope: list[
+        Literal[
+            "Confidentiality",
+            "Availability",
+            "Integrity",
+            "Access Control",
+            "Other",
+            "Non-Repudiation",
+            "Authorization",
+            "Authentication",
+            "Accountability",
+        ]
+    ] = Field(description="The weakness' general impact scope")
+    impact: list[str] = Field(
         description="A technical description of the impact enabled by this weakness"
     )
     note: str = Field(description="An optional note about the impact")
@@ -66,7 +76,7 @@ class CweJsonModel(BaseModel):
 
     id: int = Field(description="The numeric CWE ID")
     name: str = Field(description="The title of the weakness")
-    mapping: Literal["Allowed", "Allowed-With-Review", "Discouraged", "Prohibited"] = (
+    mapping: Literal["Allowed", "Allowed-with-Review", "Discouraged", "Prohibited"] = (
         Field(description="Whether the CWE can be mapped to real-world vulnerabilities")
     )
     abstraction: Literal["variant", "base", "composite", "class", "category"] = Field(

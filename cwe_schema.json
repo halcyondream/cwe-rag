@@ -5,18 +5,30 @@
       "properties": {
         "scope": {
           "description": "The weakness' general impact scope",
-          "enum": [
-            "Confidentiality",
-            "Availability",
-            "Integrity"
-          ],
+          "items": {
+            "enum": [
+              "Confidentiality",
+              "Availability",
+              "Integrity",
+              "Access Control",
+              "Other",
+              "Non-Repudiation",
+              "Authorization",
+              "Authentication",
+              "Accountability"
+            ],
+            "type": "string"
+          },
           "title": "Scope",
-          "type": "string"
+          "type": "array"
         },
         "impact": {
           "description": "A technical description of the impact enabled by this weakness",
+          "items": {
+            "type": "string"
+          },
           "title": "Impact",
-          "type": "string"
+          "type": "array"
         },
         "note": {
           "description": "An optional note about the impact",
@@ -136,7 +148,7 @@
       "description": "Whether the CWE can be mapped to real-world vulnerabilities",
       "enum": [
         "Allowed",
-        "Allowed-With-Review",
+        "Allowed-with-Review",
         "Discouraged",
         "Prohibited"
       ],

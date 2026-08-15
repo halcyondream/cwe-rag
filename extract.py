@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 from zipfile import ZipFile
 from common import iter_values, cache_file_from_url
+from model import CweJsonModel
 
 load_dotenv()
 
@@ -214,6 +215,9 @@ class CweXmlExtractor:
             "consequences": consequences,
         }
 
+        print(consequences)
+        CweJsonModel.model_validate(cwe_metadata, strict=True)
+
         with open(self.output_folder / f"cwe-{cwe_id}.json", "w") as f:
             f.write(json.dumps(cwe_metadata, indent=2))
 
@@ -247,11 +251,16 @@ class CweXmlExtractor:
         """
         Normalize a CWE's consequences into intuitive scope, impact, and notes.
         """
-        get_json = lambda data: {
-            "scope": data.get("Scope") or "",
-            "impact": data.get("Impact") or "",
-            "note": "\n".join(iter_values(data.get("Note"))) or "",
-        }
+
+        def get_json(data):
+            scope = data.get("Scope") or []
+            impact = data.get("Impact") or []
+            note = data.get("Note") or "\n".join(iter_values(data.get("Note")))
+            if type(scope) != list:
+                scope = [scope]
+            if type(impact) != list:
+                impact = [impact]
+            return {"scope": scope, "impact": impact, "note": note}
 
         cwe_consequences = cwe_json.get("Common_Consequences")
 
@@ -273,5 +282,6 @@ class CweXmlExtractor:
 
 if __name__ == "__main__":
     extractor = CweXmlExtractor()
+    extractor.clear_files()
     extractor.extract()
     extractor.print_stats()
