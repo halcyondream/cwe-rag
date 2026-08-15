@@ -1,7 +1,8 @@
 venv/
 cache/
 .env
-cwes-extracted/
+cwes-json/
 chroma/
 cwes-md/
+web-cache/
 __pycache__/

@@ -1,11 +1,11 @@
-import os
 import json
 from jinja2 import Template
 import re
 from dotenv import load_dotenv
 from pathlib import Path
 import yaml
-from pydantic import BaseModel
+from model import CweJsonModel
+import defaults
 
 load_dotenv()
 
@@ -15,15 +15,14 @@ class CweJsonToMarkdownTransformer:
     Convert CWE JSON from files to markdown-with-topmatter files.
     """
 
-    def __init__(self, model: BaseModel):
-        self.json_folder = Path(os.environ.get("OUTPUT_FOLDER"))
-        self.md_folder = Path(os.environ.get("OUTPUT_FOLDER_MD"))
-        self.model = model
+    def __init__(self, json_folder=None, md_folder=None):
+        self.json_folder = Path(json_folder or defaults.json_output_folder)
+        self.md_folder = Path(md_folder or defaults.md_output_folder)
 
         if not self.md_folder.exists():
             self.md_folder.mkdir()
 
-    def transform(self):
+    def transform(self, validate=True):
         """
         Transform the intermediary representation JSON to markdown.
         Preserve metadata as YAML topmatter.
@@ -42,7 +41,8 @@ class CweJsonToMarkdownTransformer:
             with open(file.absolute()) as f:
                 data = json.load(f)
 
-            self.model.model_validate(data)
+            if validate:
+                CweJsonModel.model_validate(data, strict=True)
 
             md_template = Template(cwe_template)
 
@@ -69,5 +69,5 @@ class CweJsonToMarkdownTransformer:
 if __name__ == "__main__":
     from model import CweJsonModel
 
-    transformer = CweJsonToMarkdownTransformer(CweJsonModel)
+    transformer = CweJsonToMarkdownTransformer()
     transformer.transform()

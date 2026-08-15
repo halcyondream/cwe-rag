@@ -6,7 +6,8 @@ import os
 from pathlib import Path
 from zipfile import ZipFile
 from common import iter_values, cache_file_from_url
-from pydantic import BaseModel
+from model import CweJsonModel
+import defaults
 
 load_dotenv()
 
@@ -22,16 +23,21 @@ class CweXmlExtractor:
     Alternatively, if you just want the JSON, this is the class you care about.
     """
 
-    def __init__(self, model: BaseModel):
-        self.ignore_prohibited = os.environ.get("IGNORE_PROHIBITED") or False
-        self.ignore_discouraged = os.environ.get("IGNORE_DISCOURAGED") or False
-        self.output_folder = Path(os.environ.get("OUTPUT_FOLDER"))
-        self.cache_folder = Path("./cache")
+    def __init__(
+        self,
+        output_folder=None,
+        cache_folder=None,
+        ignore_prohibited=True,
+        ignore_discouraged=True,
+    ):
+        self.ignore_prohibited = ignore_prohibited
+        self.ignore_discouraged = ignore_discouraged
+        self.output_folder = Path(output_folder or defaults.json_output_folder)
+        self.cache_folder = Path(cache_folder or defaults.web_cache_folder)
         self.cwe_xml = None
-        self.model = model
 
         if not self.cache_folder.exists():
-            self.output_folder.mkdir()
+            self.cache_folder.mkdir()
 
         if not self.output_folder.exists():
             self.output_folder.mkdir()
@@ -216,7 +222,7 @@ class CweXmlExtractor:
             "consequences": consequences,
         }
 
-        self.model.model_validate(cwe_metadata, strict=True)
+        CweJsonModel.model_validate(cwe_metadata, strict=True)
 
         with open(self.output_folder / f"cwe-{cwe_id}.json", "w") as f:
             f.write(json.dumps(cwe_metadata, indent=2))
@@ -283,9 +289,7 @@ class CweXmlExtractor:
 
 
 if __name__ == "__main__":
-    from model import CweJsonModel
-
-    extractor = CweXmlExtractor(CweJsonModel)
+    extractor = CweXmlExtractor()
     extractor.clear_files()
     extractor.extract()
     extractor.print_stats()
