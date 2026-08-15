@@ -7,7 +7,6 @@ from pathlib import Path
 from zipfile import ZipFile
 from common import iter_values, cache_file_from_url
 from model import CweJsonModel
-import defaults
 from config import Config
 
 load_dotenv()

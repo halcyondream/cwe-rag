@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 from pathlib import Path
 import yaml
 from model import CweJsonModel
-import defaults
 from config import Config 
 
 load_dotenv()
