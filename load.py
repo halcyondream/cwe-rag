@@ -12,6 +12,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter, Language
 import os
 import yaml
 from common import iter_values
+from pydantic import BaseModel
 
 
 class CweMarkdownToChromaLoader:
@@ -19,10 +20,11 @@ class CweMarkdownToChromaLoader:
     Load a CWE markdown representation into a Chroma Vector Database.
     """
 
-    def __init__(self):
+    def __init__(self, model: BaseModel):
         self.ollama_host = os.environ.get("OLLAMA_HOST")
         self.embedding_model = os.environ.get("EMBEDDING_MODEL")
         self.markdown_folder = Path(os.environ.get("OUTPUT_FOLDER_MD"))
+        self.model = model
 
     def _initialize_db(self):
         ollama_embedding_function = OllamaEmbeddingFunction(
@@ -57,6 +59,8 @@ class CweMarkdownToChromaLoader:
             with open(cwe_file) as f:
                 content = f.read()
                 topmatter, cwe_md = self._extract_markdown(content)
+
+            self.model.model_validate(topmatter)
 
             cwe_id = topmatter["id"]
             cwe_name = topmatter["name"]
@@ -151,6 +155,7 @@ class CweMarkdownToChromaLoader:
 
 
 if __name__ == "__main__":
-    loader = CweMarkdownToChromaLoader()
+    from model import CweJsonModel
+    loader = CweMarkdownToChromaLoader(CweJsonModel)
     loader.delete_database()
     loader.load()

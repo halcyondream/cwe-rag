@@ -158,11 +158,11 @@
     "abstraction": {
       "description": "The CWE's abstraction level (base and variant preferred)",
       "enum": [
-        "variant",
-        "base",
-        "composite",
-        "class",
-        "category"
+        "Variant",
+        "Base",
+        "Compound",
+        "Class",
+        "Category"
       ],
       "title": "Abstraction",
       "type": "string"

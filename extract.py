@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from zipfile import ZipFile
 from common import iter_values, cache_file_from_url
-from model import CweJsonModel
+from pydantic import BaseModel
 
 load_dotenv()
 
@@ -22,12 +22,13 @@ class CweXmlExtractor:
     Alternatively, if you just want the JSON, this is the class you care about.
     """
 
-    def __init__(self):
+    def __init__(self, model: BaseModel):
         self.ignore_prohibited = os.environ.get("IGNORE_PROHIBITED") or False
         self.ignore_discouraged = os.environ.get("IGNORE_DISCOURAGED") or False
         self.output_folder = Path(os.environ.get("OUTPUT_FOLDER"))
         self.cache_folder = Path("./cache")
         self.cwe_xml = None
+        self.model = model
 
         if not self.cache_folder.exists():
             self.output_folder.mkdir()
@@ -101,7 +102,7 @@ class CweXmlExtractor:
         cwe_id = int(cwe_json["@ID"])
         cwe_name = cwe_json["@Name"]
         cwe_mapping = cwe_json["Mapping_Notes"]["Usage"]
-        cwe_abstraction = cwe_json["@Abstraction"].lower()
+        cwe_abstraction = cwe_json["@Abstraction"]
 
         print(
             f"\n[{round((idx/len(self.all_weaknesses))*100)}% | {idx+1}/{len(self.all_weaknesses)}] CWE-{cwe_id}: {cwe_name}\n"
@@ -215,8 +216,7 @@ class CweXmlExtractor:
             "consequences": consequences,
         }
 
-        print(consequences)
-        CweJsonModel.model_validate(cwe_metadata, strict=True)
+        self.model.model_validate(cwe_metadata, strict=True)
 
         with open(self.output_folder / f"cwe-{cwe_id}.json", "w") as f:
             f.write(json.dumps(cwe_metadata, indent=2))
@@ -283,7 +283,9 @@ class CweXmlExtractor:
 
 
 if __name__ == "__main__":
-    extractor = CweXmlExtractor()
+    from model import CweJsonModel
+
+    extractor = CweXmlExtractor(CweJsonModel)
     extractor.clear_files()
     extractor.extract()
     extractor.print_stats()
