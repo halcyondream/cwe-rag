@@ -18,6 +18,7 @@ class CweMarkdownToChromaLoader:
     """
     Load a CWE markdown representation into a Chroma Vector Database.
     """
+
     def __init__(self):
         self.ollama_host = os.environ.get("OLLAMA_HOST")
         self.embedding_model = os.environ.get("EMBEDDING_MODEL")
@@ -36,7 +37,9 @@ class CweMarkdownToChromaLoader:
             metadata={"hnsw:space": "cosine"},
         )
 
-        self.splitter = RecursiveCharacterTextSplitter.from_language(language=Language.MARKDOWN)
+        self.splitter = RecursiveCharacterTextSplitter.from_language(
+            language=Language.MARKDOWN
+        )
 
     def load(self):
         """
@@ -54,7 +57,7 @@ class CweMarkdownToChromaLoader:
             with open(cwe_file) as f:
                 content = f.read()
                 topmatter, cwe_md = self._extract_markdown(content)
-            
+
             cwe_id = topmatter["id"]
             cwe_name = topmatter["name"]
             cwe_abstraction = topmatter["abstraction"]
@@ -130,14 +133,14 @@ class CweMarkdownToChromaLoader:
 
         if not lines or lines[0].rstrip("\r\n") != "---":
             return {}, text
-        
+
         for i, line in enumerate(lines[1:], start=1):
             if line.rstrip("\r\n") in {"---", "..."}:
                 metadata = yaml.safe_load("".join(lines[1:i])) or {}
                 return metadata, "".join(lines[i + 1 :]).strip()
-        
+
         raise ValueError("Unclosed YAML topmatter")
-    
+
     def _get_keywords(self, cwe_json: dict) -> list[str]:
         """
         Flatten keywords as a list.

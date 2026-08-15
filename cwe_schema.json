@@ -1,0 +1,217 @@
+{
+  "$defs": {
+    "ConsequenceModel": {
+      "description": "In CWE parlance, a consequence entails a scope (from the CIA triad),\na technical explanation of the impact, and optional notes.",
+      "properties": {
+        "scope": {
+          "description": "The weakness' general impact scope",
+          "enum": [
+            "Confidentiality",
+            "Availability",
+            "Integrity"
+          ],
+          "title": "Scope",
+          "type": "string"
+        },
+        "impact": {
+          "description": "A technical description of the impact enabled by this weakness",
+          "title": "Impact",
+          "type": "string"
+        },
+        "note": {
+          "description": "An optional note about the impact",
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "scope",
+        "impact",
+        "note"
+      ],
+      "title": "ConsequenceModel",
+      "type": "object"
+    },
+    "CveModel": {
+      "properties": {
+        "cve_id": {
+          "description": "The ID of the associated CVE",
+          "title": "Cve Id",
+          "type": "string"
+        },
+        "cve_description": {
+          "description": "The CVE's description",
+          "title": "Cve Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "cve_id",
+        "cve_description"
+      ],
+      "title": "CveModel",
+      "type": "object"
+    },
+    "PlatformInfoModel": {
+      "description": "Platform information is derived from the weakness itself.\nThe CWE documentation often leaves these fields empty or even ambiguous.\nAn LLM classification step may be desirable to enrich or supplement these\nshortcomings.",
+      "properties": {
+        "langauges": {
+          "default": [],
+          "description": "A list of related programming languages",
+          "items": {
+            "type": "string"
+          },
+          "title": "Langauges",
+          "type": "array"
+        },
+        "is_language_specific": {
+          "default": false,
+          "description": "A heuristic from the platform info.",
+          "title": "Is Language Specific",
+          "type": "boolean"
+        },
+        "operating_systems": {
+          "default": [],
+          "description": "A list of related operating systems",
+          "items": {
+            "type": "string"
+          },
+          "title": "Operating Systems",
+          "type": "array"
+        },
+        "is_os_specific": {
+          "default": false,
+          "description": "A heuristic from the platform info.",
+          "title": "Is Os Specific",
+          "type": "boolean"
+        },
+        "technologies": {
+          "default": [],
+          "description": "A list of related technologies",
+          "items": {
+            "type": "string"
+          },
+          "title": "Technologies",
+          "type": "array"
+        },
+        "is_technology_specific": {
+          "default": false,
+          "description": "A heuristic from the platform info.",
+          "title": "Is Technology Specific",
+          "type": "boolean"
+        },
+        "architecturees": {
+          "default": [],
+          "description": "A list of related architectures",
+          "items": {
+            "type": "string"
+          },
+          "title": "Architecturees",
+          "type": "array"
+        },
+        "is_architecture_specific": {
+          "default": false,
+          "description": "A heuristic from the platform info",
+          "title": "Is Architecture Specific",
+          "type": "boolean"
+        }
+      },
+      "title": "PlatformInfoModel",
+      "type": "object"
+    }
+  },
+  "description": "This schema captures key information about a CWE.\nIt does not capture ALL information, including references and mapping notes.\nFor complex analysis, refer to the official documentation.",
+  "properties": {
+    "id": {
+      "description": "The numeric CWE ID",
+      "title": "Id",
+      "type": "integer"
+    },
+    "name": {
+      "description": "The title of the weakness",
+      "title": "Name",
+      "type": "string"
+    },
+    "mapping": {
+      "description": "Whether the CWE can be mapped to real-world vulnerabilities",
+      "enum": [
+        "Allowed",
+        "Allowed-With-Review",
+        "Discouraged",
+        "Prohibited"
+      ],
+      "title": "Mapping",
+      "type": "string"
+    },
+    "abstraction": {
+      "description": "The CWE's abstraction level (base and variant preferred)",
+      "enum": [
+        "variant",
+        "base",
+        "composite",
+        "class",
+        "category"
+      ],
+      "title": "Abstraction",
+      "type": "string"
+    },
+    "description": {
+      "description": "The weakness' brief description",
+      "title": "Description",
+      "type": "string"
+    },
+    "extended_description": {
+      "default": "",
+      "description": "An optional extended description of the weakness",
+      "title": "Extended Description",
+      "type": "string"
+    },
+    "background": {
+      "default": "",
+      "description": "An optional background description",
+      "title": "Background",
+      "type": "string"
+    },
+    "cves": {
+      "default": [],
+      "description": "A list of known CVE vulnerabilities whose root cause is represented by this weakness",
+      "items": {
+        "$ref": "#/$defs/CveModel"
+      },
+      "title": "Cves",
+      "type": "array"
+    },
+    "capecs": {
+      "default": [],
+      "description": "A list of CAPEC attack patterns associated with this weakness",
+      "items": {
+        "type": "integer"
+      },
+      "title": "Capecs",
+      "type": "array"
+    },
+    "platform_info": {
+      "$ref": "#/$defs/PlatformInfoModel",
+      "description": "Any platform information associated with the weakness"
+    },
+    "consequences": {
+      "description": "Any impacts associated with this weakness",
+      "items": {
+        "$ref": "#/$defs/ConsequenceModel"
+      },
+      "title": "Consequences",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "mapping",
+    "abstraction",
+    "description",
+    "platform_info",
+    "consequences"
+  ],
+  "title": "CweJsonModel",
+  "type": "object"
+}
