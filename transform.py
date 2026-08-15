@@ -6,6 +6,7 @@ from pathlib import Path
 import yaml
 from model import CweJsonModel
 import defaults
+from config import Config 
 
 load_dotenv()
 
@@ -15,9 +16,10 @@ class CweJsonToMarkdownTransformer:
     Convert CWE JSON from files to markdown-with-topmatter files.
     """
 
-    def __init__(self, json_folder=None, md_folder=None):
-        self.json_folder = Path(json_folder or defaults.json_output_folder)
-        self.md_folder = Path(md_folder or defaults.md_output_folder)
+    def __init__(self, config: Config, json_folder=None, md_folder=None):
+        self.config = config
+        self.json_folder = Path(json_folder or self.config.json_output_folder)
+        self.md_folder = Path(md_folder or self.config.md_output_folder)
 
         if not self.md_folder.exists():
             self.md_folder.mkdir()
@@ -69,5 +71,6 @@ class CweJsonToMarkdownTransformer:
 if __name__ == "__main__":
     from model import CweJsonModel
 
-    transformer = CweJsonToMarkdownTransformer()
+    config = Config(CweJsonModel)
+    transformer = CweJsonToMarkdownTransformer(config)
     transformer.transform()

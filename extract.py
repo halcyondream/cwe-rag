@@ -8,6 +8,7 @@ from zipfile import ZipFile
 from common import iter_values, cache_file_from_url
 from model import CweJsonModel
 import defaults
+from config import Config
 
 load_dotenv()
 
@@ -25,15 +26,17 @@ class CweXmlExtractor:
 
     def __init__(
         self,
+        config: Config,
         output_folder=None,
         cache_folder=None,
         ignore_prohibited=True,
         ignore_discouraged=True,
     ):
+        self.config = config
         self.ignore_prohibited = ignore_prohibited
         self.ignore_discouraged = ignore_discouraged
-        self.output_folder = Path(output_folder or defaults.json_output_folder)
-        self.cache_folder = Path(cache_folder or defaults.web_cache_folder)
+        self.output_folder = Path(output_folder or self.config.json_output_folder)
+        self.cache_folder = Path(cache_folder or self.config.web_cache_folder)
         self.cwe_xml = None
 
         if not self.cache_folder.exists():
@@ -289,7 +292,8 @@ class CweXmlExtractor:
 
 
 if __name__ == "__main__":
-    extractor = CweXmlExtractor()
+    config = Config(CweJsonModel)
+    extractor = CweXmlExtractor(config)
     extractor.clear_files()
     extractor.extract()
     extractor.print_stats()
