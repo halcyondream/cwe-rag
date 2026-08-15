@@ -260,6 +260,8 @@ class CweXmlExtractor:
                 scope = [scope]
             if type(impact) != list:
                 impact = [impact]
+            if type(note) == dict or type(note) == list:
+                note = "\n".join(iter_values(note))
             return {"scope": scope, "impact": impact, "note": note}
 
         cwe_consequences = cwe_json.get("Common_Consequences")

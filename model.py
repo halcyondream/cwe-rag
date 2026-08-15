@@ -79,7 +79,7 @@ class CweJsonModel(BaseModel):
     mapping: Literal["Allowed", "Allowed-with-Review", "Discouraged", "Prohibited"] = (
         Field(description="Whether the CWE can be mapped to real-world vulnerabilities")
     )
-    abstraction: Literal["variant", "base", "composite", "class", "category"] = Field(
+    abstraction: Literal["variant", "base", "compound", "class", "category"] = Field(
         description="The CWE's abstraction level (base and variant preferred)"
     )
     description: str = Field(description="The weakness' brief description")
