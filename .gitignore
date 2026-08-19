@@ -4,3 +4,4 @@ cache/
 chroma/
 __pycache__/
 cwe_md_files/
+.ruff_cache/

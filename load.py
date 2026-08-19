@@ -3,6 +3,7 @@ Load markdown + topmatter into a local Chroma vector database.
 """
 
 import os
+from abc import ABC, abstractmethod
 from pathlib import Path
 
 import chromadb
@@ -17,18 +18,31 @@ from config import Config
 from runner import IHook
 
 
-class IEmbeddingClient:
+class IEmbeddingClient(ABC):
+
+    @abstractmethod
     def initialize(self):
-        pass
+        """
+        Initialize the data store.
+        """
 
     def get_chunks(self, document):
-        pass
+        """
+        Represent a text document as a list of vector chunks.
+        """
 
     def add_document_chunked(self, document, doc_idx, metadata: dict | None = None):
-        pass
+        """
+        Add a document to the data store in its chunked form.
+        """
+
+    def query_texts(self, query: str, filter: dict, n_results=6):
+        """
+        Perform a similarity search of documents based on your query.
+        """
 
 
-class OllamaEmbeddingClient:
+class OllamaChromaEmbeddingClient(IEmbeddingClient):
     def __init__(
         self,
         config: Config,
@@ -76,6 +90,13 @@ class OllamaEmbeddingClient:
             else:
                 self._add_chunk(chunk, doc_idx, chunk_idx)
 
+    def query_texts(self, query: str, filter: dict, n_results=6):
+        return self.collection.query(
+            query_texts=[query],
+            n_results=n_results,
+            where=filter
+        )
+
     def _add_chunk(self, chunk, doc_idx, chunk_idx):
         """
         Add a chunk without metadata.
@@ -96,7 +117,7 @@ class OllamaEmbeddingClient:
         )
 
 
-class CweMarkdownToChromaLoader(IHook):
+class CweMarkdownLoader(IHook):
     """
     Load a CWE markdown representation into a Chroma Vector Database.
     """
@@ -208,7 +229,7 @@ if __name__ == "__main__":
     from model import CweJsonModel
 
     config = Config(CweJsonModel)
-    client = OllamaEmbeddingClient(config)
-    loader = CweMarkdownToChromaLoader(config, client)
+    client = OllamaChromaEmbeddingClient(config)
+    loader = CweMarkdownLoader(config, client)
     loader.delete_database()
     loader.load()

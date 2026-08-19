@@ -4,14 +4,19 @@ Handles CWEs for vector databae queries or retrieval-augmented generation
 (RAG) systems.
 
 I got tired of LLMs hallucinating the use of prohibited/discouraged CWEs
-in analysis activities. This system is catered towards bridging that gap.
+in analysis activities. The CWE XML exports are also a bit inconsistent and
+sometimes messy, which can frustrate root-cause analysis and triage.
 
-This solution has two main modes:
+This system is catered towards bridging those gaps.
+
+The solution has two main modes:
 
 - A complete ETL from the official CWE XML catalog
 
 - Copying mappable or unmappable CWE markdown files for use however
   you want
+
+- A simple one-shot query
 
 ChromaDB and Ollama are used for the vector DB reference 
 implementation.
@@ -50,6 +55,49 @@ platform.
 
 The schema is enforced in the `model.py` file and viewable in the
 `cwe_schema.json` file. 
+
+# Limitations
+
+Due to the nature of similarity searches, and likely the limitations of
+the small document bodies, this solution as-is may miss key CWEs. For 
+example, the string "xss" may completely miss CWE-79 because the embedding
+doesn't actually include the "xss" string in its title, description, or extended
+description. Future versions of this app will take these edge cases into
+consideration. 
+
+Speaking of the small document bodies, the decision to include only these
+features was mostly driven by testing against small models (20B and less).
+The limitations of these context windows caused simple use cases, like
+"pick the best of these six CWEs," to fail or hallucinate when the CWE document
+size included too many details. The "query" reference implementation provides
+implicit guidance on how to extract strategic information about any CWE based
+on its metadata. It would serve RAG developers to follow an approach that
+decouples the actual document from the information provided to an LLM's
+context window in order to balance search fidelity with actual content 
+retrieval.
+
+Speaking of RAG solutions, despite the emphasis on RAG, the CLI reference 
+implementation does not actually provide a RAG demo. This is due entirely
+to discussions around the context window of different models. My opinion is
+that the developer should determine the RAG context when utilizing the outputs
+of a system like this one. Put another way, the point of this system is to 
+normalize CWE content for use in your own RAG solution.
+
+The reference implementation targets an Ollama embedding function with a 
+local ChromaDB vector database. Real systems will almost certainly want to
+utilize platforms like OpenAI, Anthropic, and cloud-hosted vector databases,
+which could include Chroma Cloud. To achieve this, simply implement the 
+`IEmbeddingClient` class to taste, and use it with the given loader.
+
+Many of the overall goals of this project focus on *mappable* CWEs. The CWE
+project emphasizes that practitioners leverage specific, mappable CWEs, but it
+leaves an uncomfortable amount of room for interpretation. Due to LLMs' 
+tendency to pull all kinds of CWEs (including, sometimes, even *prohibited*
+ones), or hallucinating CWE artifacts outright, this solution is opinionated
+in favor of the mappable weaknesses. With that said, practitioners should use
+their best judgement when assigning root-cause weaknesses to vulnerabilities
+in the wild and internally.
+
 
 # Example MD file
 

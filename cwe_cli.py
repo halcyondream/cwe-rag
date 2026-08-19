@@ -4,7 +4,7 @@ from pathlib import Path
 from common import get_markdown
 from config import Config
 from extract import CweXmlExtractor
-from load import CweMarkdownToChromaLoader, OllamaEmbeddingClient
+from load import CweMarkdownLoader, IEmbeddingClient, OllamaChromaEmbeddingClient
 from model import CweJsonModel
 from runner import SequentialRunner
 from transform import CweJsonToMarkdownTransformer
@@ -39,10 +39,38 @@ def copy_md_files(include_prohibited=False, include_discouraged=False):
         md.copy(target_path)
 
 
+def query(client: IEmbeddingClient):
+    """
+    Demoes a simple similarity search from the vector database.
+    Omits PROHIBITED, DISCOURAGED, and Class CWEs.
+    """
+    client.initialize()
+    query = input("Describe your vulnerability> ")
+    filter = {
+        "$and": [
+            {"abstraction": {"$ne": "class"}},
+            {"mapping": {"$ne": "Prohibited"}},
+            {"mapping": {"$ne": "Discouraged"}}
+        ]
+    }
+    results = client.query_texts(query, filter)
+
+    metadata = results.get("metadatas")[0]
+
+    for meta in metadata:
+        id = meta["cwe_id"]
+        name = meta["name"]
+        abstraction = meta["abstraction"]
+        mapping = meta["mapping"]
+        desc = meta["description"]
+        impacts = meta["impacts"]
+        print(f"---\n\nCWE-{id}: {name}\n[{abstraction} | {mapping}]\n{desc}\n{impacts}\n")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "mode", help="Run the pipeline or copy artifacts", choices=["run", "copy-md"]
+        "mode", help="Run the pipeline or copy artifacts", choices=["run", "copy-md", "query"]
     )
     parser.add_argument(
         "--noextract",
@@ -84,9 +112,9 @@ if __name__ == "__main__":
         transformer = CweJsonToMarkdownTransformer(config)
         runner.register(transformer)
 
-    if not args.noload:
-        client = OllamaEmbeddingClient(config)
-        loader = CweMarkdownToChromaLoader(config, client)
+    if not args.noloading:
+        client = OllamaChromaEmbeddingClient(config)
+        loader = CweMarkdownLoader(config, client)
         runner.register(loader)
 
     if args.mode == "run":
@@ -97,3 +125,6 @@ if __name__ == "__main__":
             include_prohibited=args.include_prohibited,
             include_discouraged=args.include_discouraged,
         )
+
+    elif args.mode == "query":
+        query(client)
