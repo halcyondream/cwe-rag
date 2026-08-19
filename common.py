@@ -29,8 +29,7 @@ def cache_file_from_url(url, target_path):
     resp.raise_for_status()
 
     with open(target_path, "wb") as f:
-        for chunk in resp.iter_content(chunk_size=8192):
-            f.write(chunk)
+        f.writelines(resp.iter_content(chunk_size=8192))
 
 
 def get_markdown(text):

@@ -1,13 +1,13 @@
-from extract import CweXmlExtractor
-from transform import CweJsonToMarkdownTransformer
-from load import OllamaEmbeddingClient, CweMarkdownToChromaLoader
-from runner import SequentialRunner
-from config import Config
-from model import CweJsonModel
 import argparse
 from pathlib import Path
-from common import get_markdown
 
+from common import get_markdown
+from config import Config
+from extract import CweXmlExtractor
+from load import CweMarkdownToChromaLoader, OllamaEmbeddingClient
+from model import CweJsonModel
+from runner import SequentialRunner
+from transform import CweJsonToMarkdownTransformer
 
 config = Config(CweJsonModel)
 runner = SequentialRunner()
@@ -57,7 +57,7 @@ if __name__ == "__main__":
         default=False,
     )
     parser.add_argument(
-        "--noload",
+        "--noloading",
         help="Any steps to omit from the pipeline",
         action="store_true",
         default=False,

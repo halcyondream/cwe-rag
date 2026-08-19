@@ -1,11 +1,13 @@
 import json
-from jinja2 import Template
 import re
-from dotenv import load_dotenv
 from pathlib import Path
+
 import yaml
-from model import CweJsonModel
+from dotenv import load_dotenv
+from jinja2 import Template
+
 from config import Config
+from model import CweJsonModel
 from runner import IHook
 
 load_dotenv()

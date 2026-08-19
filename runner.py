@@ -11,7 +11,6 @@ class IHook(ABC):
         """
         Defines the main execution logic.
         """
-        pass
 
     @abstractmethod
     def assert_success(self):
@@ -20,14 +19,12 @@ class IHook(ABC):
         Use in tandem with a run to assert the overall success or failure
         of the execution.
         """
-        pass
 
     @abstractmethod
     def clean(self):
         """
         Define a clean state prior to a run.
         """
-        pass
 
 
 class SequentialRunner:

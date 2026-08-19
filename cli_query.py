@@ -2,11 +2,10 @@
 # to query the vectordb and test the efficacy of all of this
 # lol.
 
+
 import chromadb
 from chromadb import Collection
-import os
 from dotenv import load_dotenv
-import json
 
 load_dotenv()
 

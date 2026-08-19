@@ -1,12 +1,13 @@
 import json
-import xmltodict
-from dotenv import load_dotenv
-import os
 from pathlib import Path
 from zipfile import ZipFile
-from common import iter_values, cache_file_from_url
-from model import CweJsonModel
+
+import xmltodict
+from dotenv import load_dotenv
+
+from common import cache_file_from_url, iter_values
 from config import Config
+from model import CweJsonModel
 from runner import IHook
 
 load_dotenv()

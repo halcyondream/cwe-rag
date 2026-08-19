@@ -2,19 +2,19 @@
 Load markdown + topmatter into a local Chroma vector database.
 """
 
+import os
+from pathlib import Path
+
 import chromadb
 from chromadb import Collection
 from chromadb.utils.embedding_functions.ollama_embedding_function import (
     OllamaEmbeddingFunction,
 )
-from pathlib import Path
-from langchain_text_splitters import RecursiveCharacterTextSplitter, Language
-import os
-import yaml
-from common import iter_values
+from langchain_text_splitters import Language, RecursiveCharacterTextSplitter
+
+from common import get_markdown, iter_values
 from config import Config
 from runner import IHook
-from common import get_markdown
 
 
 class IEmbeddingClient:
@@ -113,7 +113,6 @@ class CweMarkdownToChromaLoader(IHook):
         """
         TODO: Return something sane like the length of the database.
         """
-        pass
 
     def clean(self):
         self.delete_database()
