@@ -3,7 +3,7 @@ from pathlib import Path
 
 from common import get_markdown
 from config import Config
-from cwe_rag_demo import rag_demo
+from cwe_rag_demo import agentic_demo, rag_demo
 from extract import CweXmlExtractor
 from load import CweMarkdownLoader, IEmbeddingClient, OllamaChromaEmbeddingClient
 from model import CweJsonModel
@@ -78,7 +78,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "mode",
         help="The type of run mode",
-        choices=["build", "copy-md", "query", "rag"],
+        choices=["build", "copy-md", "query", "rag", "agentic"],
     )
     parser.add_argument(
         "--noextract",
@@ -139,3 +139,6 @@ if __name__ == "__main__":
 
     elif args.mode == "rag":
         rag_demo(client)
+
+    elif args.mode == "agentic":
+        agentic_demo(client)
