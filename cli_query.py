@@ -53,10 +53,4 @@ for meta in metadatas:
     mapping = meta["mapping"]
     desc = meta["description"]
     impacts = meta["impacts"]
-    print(
-        "---\n\n"
-        f"CWE-{id}: {name}\n"
-        f"[{abstraction} | {mapping}]\n"
-        f"{desc}\n"
-        f"{impacts}\n"
-    )
+    print(f"---\n\nCWE-{id}: {name}\n[{abstraction} | {mapping}]\n{desc}\n{impacts}\n")

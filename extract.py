@@ -122,7 +122,7 @@ class CweXmlExtractor(IHook):
         cwe_abstraction = cwe_json["@Abstraction"]
 
         print(
-            f"\n[{round((idx/len(self.all_weaknesses))*100)}% | {idx+1}/{len(self.all_weaknesses)}] CWE-{cwe_id}: {cwe_name}\n"
+            f"\n[{round((idx / len(self.all_weaknesses)) * 100)}% | {idx + 1}/{len(self.all_weaknesses)}] CWE-{cwe_id}: {cwe_name}\n"
         )
 
         if f"cwe-{cwe_id}.json" in self.preexisting_extractions:

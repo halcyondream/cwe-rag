@@ -82,7 +82,7 @@ class OllamaEmbeddingClient:
         """
         self.collection.add(
             documents=chunk,
-            ids=f"cwe_{doc_idx+1}_{chunk_idx+1}",
+            ids=f"cwe_{doc_idx + 1}_{chunk_idx + 1}",
         )
 
     def _add_chunk_with_metadata(self, chunk, doc_idx, chunk_idx, metadata: dict):
@@ -90,7 +90,9 @@ class OllamaEmbeddingClient:
         Add a chunk with chunks.
         """
         self.collection.add(
-            documents=chunk, ids=f"cwe_{doc_idx+1}_{chunk_idx+1}", metadatas=metadata
+            documents=chunk,
+            ids=f"cwe_{doc_idx + 1}_{chunk_idx + 1}",
+            metadatas=metadata,
         )
 
 
@@ -128,7 +130,6 @@ class CweMarkdownToChromaLoader(IHook):
             raise ValueError("No markdown files were found")
 
         for doc_idx, cwe_file in enumerate(md_files):
-
             with open(cwe_file) as f:
                 content = f.read()
                 topmatter, cwe_md = self._extract_markdown(content)
