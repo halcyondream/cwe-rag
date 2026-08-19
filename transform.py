@@ -6,11 +6,12 @@ from pathlib import Path
 import yaml
 from model import CweJsonModel
 from config import Config
+from runner import IHook
 
 load_dotenv()
 
 
-class CweJsonToMarkdownTransformer:
+class CweJsonToMarkdownTransformer(IHook):
     """
     Convert CWE JSON from files to markdown-with-topmatter files.
     """
@@ -22,6 +23,15 @@ class CweJsonToMarkdownTransformer:
 
         if not self.md_folder.exists():
             self.md_folder.mkdir()
+
+    def run(self):
+        self.transform()
+
+    def assert_success(self):
+        assert len(list(self.md_folder.rglob("cwe**.md"))) > 0
+
+    def clean(self):
+        self.clear_files()
 
     def transform(self, validate=True):
         """

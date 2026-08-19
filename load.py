@@ -13,6 +13,8 @@ import os
 import yaml
 from common import iter_values
 from config import Config
+from runner import IHook
+from common import get_markdown
 
 
 class IEmbeddingClient:
@@ -92,7 +94,7 @@ class OllamaEmbeddingClient:
         )
 
 
-class CweMarkdownToChromaLoader:
+class CweMarkdownToChromaLoader(IHook):
     """
     Load a CWE markdown representation into a Chroma Vector Database.
     """
@@ -101,6 +103,18 @@ class CweMarkdownToChromaLoader:
         self.client = client
         self.config = config
         self.markdown_folder = Path(cwe_md_folder or self.config.md_output_folder)
+
+    def run(self):
+        self.load()
+
+    def assert_success(self):
+        """
+        TODO: Return something sane like the length of the database.
+        """
+        pass
+
+    def clean(self):
+        self.delete_database()
 
     def load(self, validate=True):
         """
@@ -179,26 +193,7 @@ class CweMarkdownToChromaLoader:
         return {"scopes": scopes, "impacts": impacts, "notes": notes}
 
     def _extract_markdown(self, text: str) -> tuple[dict, str]:
-        """
-        Extracts a two-tuple of (topmatter, markdown,)
-
-        Args:
-            text(str): The markdown file
-
-        Returns:
-            (topmatter: dict, markdown: str,): A two-tuple of the file's contents
-        """
-        lines = text.splitlines(keepends=True)
-
-        if not lines or lines[0].rstrip("\r\n") != "---":
-            return {}, text
-
-        for i, line in enumerate(lines[1:], start=1):
-            if line.rstrip("\r\n") in {"---", "..."}:
-                metadata = yaml.safe_load("".join(lines[1:i])) or {}
-                return metadata, "".join(lines[i + 1 :]).strip()
-
-        raise ValueError("Unclosed YAML topmatter")
+        return get_markdown(text)
 
     def _get_keywords(self, cwe_json: dict) -> list[str]:
         """

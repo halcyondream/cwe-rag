@@ -3,3 +3,4 @@ cache/
 .env
 chroma/
 __pycache__/
+cwe_md_files/

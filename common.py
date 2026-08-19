@@ -1,4 +1,5 @@
 import requests
+import yaml
 
 
 def iter_values(obj) -> list[str]:
@@ -30,3 +31,26 @@ def cache_file_from_url(url, target_path):
     with open(target_path, "wb") as f:
         for chunk in resp.iter_content(chunk_size=8192):
             f.write(chunk)
+
+
+def get_markdown(text):
+    """
+    Extracts a two-tuple of (topmatter, markdown,)
+
+    Args:
+        text(str): The markdown file
+
+    Returns:
+        (topmatter: dict, markdown: str,): A two-tuple of the file's contents
+    """
+    lines = text.splitlines(keepends=True)
+
+    if not lines or lines[0].rstrip("\r\n") != "---":
+        return {}, text
+
+    for i, line in enumerate(lines[1:], start=1):
+        if line.rstrip("\r\n") in {"---", "..."}:
+            metadata = yaml.safe_load("".join(lines[1:i])) or {}
+            return metadata, "".join(lines[i + 1 :]).strip()
+
+    raise ValueError("Unclosed YAML topmatter")

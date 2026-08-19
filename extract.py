@@ -1,4 +1,3 @@
-import os
 import json
 import xmltodict
 from dotenv import load_dotenv
@@ -8,11 +7,12 @@ from zipfile import ZipFile
 from common import iter_values, cache_file_from_url
 from model import CweJsonModel
 from config import Config
+from runner import IHook
 
 load_dotenv()
 
 
-class CweXmlExtractor:
+class CweXmlExtractor(IHook):
     """
     Download and extract CWE data as a JSON intermediate representation.
 
@@ -43,6 +43,15 @@ class CweXmlExtractor:
 
         if not self.output_folder.exists():
             self.output_folder.mkdir()
+
+    def run(self):
+        self.extract()
+
+    def assert_success(self):
+        assert len(list(self.output_folder.rglob("cwe**.json"))) > 0
+
+    def clean(self):
+        self.clear_all()
 
     def extract(self):
         """
