@@ -16,7 +16,9 @@ The solution has two main modes:
 - Copying mappable or unmappable CWE markdown files for use however
   you want
 
-- A simple one-shot query
+- A simple one-shot query demo
+
+- A simple agent-based RAG demo
 
 ChromaDB and Ollama are used for the vector DB reference 
 implementation.
@@ -26,14 +28,47 @@ implementation.
 Running the ETL pipeline:
 
 ```
-python etl_cwe.py run
+python cwe_cli.py build
 ```
 
-Only generate and copy the mappable CWE files:
+Only generate and copy the mappable CWE files (skips the creation of
+the vector database):
 
 ```
-python etl_cwe.py run --noloading
-python etl_cwe.py copy-md
+python cwe_cli.py build --noloading
+python cwe_cli.py copy-md
+```
+
+Query the top six closest documents
+
+```
+python cwe_cli.py query
+Describe your vulnerability> reflected cross-site scripting
+---
+
+CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')
+[Base | Allowed]
+The product does not neutralize or incorrectly neutralizes user-controllable input before it is placed in output that is used as a web page that is served to other users.
+['Bypass Protection Mechanism', 'Read Application Data', 'Execute Unauthorized Code or Commands', 'Execute Unauthorized Code or Commands', 'Bypass Protection Mechanism', 'Read Application Data']
+
+---
+
+CWE-81: Improper Neutralization of Script in an Error Message Web Page
+[Variant | Allowed]
+The product receives input from an upstream component, but it does not neutralize or incorrectly neutralizes special characters that could be interpreted as web-scripting elements when they are sent to an error page.
+['Read Application Data', 'Execute Unauthorized Code or Commands']
+
+---
+...
+```
+
+Perform a one-shot RAG using a PydanticAI agent with your chosen LLM
+
+```
+python cwe_cli.py rag
+
+Describe your vulnerability> reflected cross-site scripting
+AgentRunResult(output=TopTwoPicks(top_cwe_id=79, secondary_cwe_id=81))
 ```
 
 # Schema and Markdown frontmatter
@@ -76,13 +111,6 @@ decouples the actual document from the information provided to an LLM's
 context window in order to balance search fidelity with actual content 
 retrieval.
 
-Speaking of RAG solutions, despite the emphasis on RAG, the CLI reference 
-implementation does not actually provide a RAG demo. This is due entirely
-to discussions around the context window of different models. My opinion is
-that the developer should determine the RAG context when utilizing the outputs
-of a system like this one. Put another way, the point of this system is to 
-normalize CWE content for use in your own RAG solution.
-
 The reference implementation targets an Ollama embedding function with a 
 local ChromaDB vector database. Real systems will almost certainly want to
 utilize platforms like OpenAI, Anthropic, and cloud-hosted vector databases,
@@ -98,6 +126,11 @@ in favor of the mappable weaknesses. With that said, practitioners should use
 their best judgement when assigning root-cause weaknesses to vulnerabilities
 in the wild and internally.
 
+Because LLMs are naturally nondeterministic in nature, you may find that multiple
+runs of the same query will yield different results. The string "reflected cross-site
+scripting" may wobble between CWE-81 and CWE-84, for example. In production, you
+may want to leverage LLM steps or agent patterns that "judge" the chosen output of
+more than one lookup and return a final, best set at the end.
 
 # Example MD file
 

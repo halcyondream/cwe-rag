@@ -92,9 +92,7 @@ class OllamaChromaEmbeddingClient(IEmbeddingClient):
 
     def query_texts(self, query: str, filter: dict, n_results=6):
         return self.collection.query(
-            query_texts=[query],
-            n_results=n_results,
-            where=filter
+            query_texts=[query], n_results=n_results, where=filter
         )
 
     def _add_chunk(self, chunk, doc_idx, chunk_idx):

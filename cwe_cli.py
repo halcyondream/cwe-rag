@@ -3,6 +3,7 @@ from pathlib import Path
 
 from common import get_markdown
 from config import Config
+from cwe_rag_demo import rag_demo
 from extract import CweXmlExtractor
 from load import CweMarkdownLoader, IEmbeddingClient, OllamaChromaEmbeddingClient
 from model import CweJsonModel
@@ -50,11 +51,12 @@ def query(client: IEmbeddingClient):
         "$and": [
             {"abstraction": {"$ne": "class"}},
             {"mapping": {"$ne": "Prohibited"}},
-            {"mapping": {"$ne": "Discouraged"}}
+            {"mapping": {"$ne": "Discouraged"}},
         ]
     }
     results = client.query_texts(query, filter)
 
+    documents = results.get("documents")[0]
     metadata = results.get("metadatas")[0]
 
     for meta in metadata:
@@ -64,13 +66,19 @@ def query(client: IEmbeddingClient):
         mapping = meta["mapping"]
         desc = meta["description"]
         impacts = meta["impacts"]
-        print(f"---\n\nCWE-{id}: {name}\n[{abstraction} | {mapping}]\n{desc}\n{impacts}\n")
+        print(
+            f"---\n\nCWE-{id}: {name}\n[{abstraction} | {mapping}]\n{desc}\n{impacts}\n"
+        )
+
+    return documents, metadata
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "mode", help="Run the pipeline or copy artifacts", choices=["run", "copy-md", "query"]
+        "mode",
+        help="The type of run mode",
+        choices=["build", "copy-md", "query", "rag"],
     )
     parser.add_argument(
         "--noextract",
@@ -117,7 +125,7 @@ if __name__ == "__main__":
         loader = CweMarkdownLoader(config, client)
         runner.register(loader)
 
-    if args.mode == "run":
+    if args.mode == "build":
         runner.run()
 
     elif args.mode == "copy-md":
@@ -128,3 +136,6 @@ if __name__ == "__main__":
 
     elif args.mode == "query":
         query(client)
+
+    elif args.mode == "rag":
+        rag_demo(client)
