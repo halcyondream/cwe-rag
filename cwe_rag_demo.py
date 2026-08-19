@@ -42,11 +42,7 @@ class RootCauseAnalysis(BaseModel):
     root_cause: str = Field(
         description="A one-sentence statement that describes the vulnerability's root cause"
     )
-    cwes: list[str] = Field(
-        description="The `CWE-<id>: <title> of the most relevant root cause weakness(es)",
-        min_length=2,
-        max_length=3,
-    )
+    top_cwes: TopTwoPicks
 
 
 def rag_demo(client: IEmbeddingClient):
@@ -64,18 +60,20 @@ def rag_demo(client: IEmbeddingClient):
     # metadata = results.get("metadatas")[0]
 
     user_prompt = (
-        "Select the top two CWEs that describe the root cause of this vulnerability."
+        "Select the top two CWEs that describe the root cause of this vulnerability.\n"
+        "Then, briefly describe the root cause in one sentence."
     )
     user_prompt += f"\n<cwes>\n{json.dumps(documents)}\n</cwes>\nMost related CWEs:\n"
 
     agent = Agent(
         model,
         instructions="You are a helpful vulnerability triage agent.",
-        output_type=TopTwoPicks,
+        output_type=RootCauseAnalysis,
+        retries=3
     )
 
     answer = agent.run_sync(user_prompt)
-    print(answer)
+    print(answer.output)
 
 
 def agentic_demo(client: IEmbeddingClient):
@@ -100,29 +98,32 @@ def agentic_demo(client: IEmbeddingClient):
         """
         user_prompt = (
             "Given the <question>, determine three to six search strings that are\n"
-            "appropriate for vector database CWE searches. For example, you may expand\n"
-            "XSS to 'cross-site scripting', sqli to 'SQL Injection', etc.\n\n"
+            "appropriate for vector database CWE searches. For example, you might expand\n"
+            "XSS to 'cross-site' and 'scripting', sqli to 'SQL' and 'Injection', etc.\n\n"
             f"<question>\n{query}\n</question>\n\nSearch terms:"
         )
+        # Leverage the sub-agent to emit a list of search strings.
         result = subagent.run_sync(
             user_prompt, deps=ctx.deps, retries=3, output_type=SearchStrings
         )
+
+        # The agent may yield a list of space-separated terms.
+        # Break this apart into a list of up to six single words.
         terms = set()
+
         for term in result.output.terms:
             for t in term.split(" "):
-                terms.add(t)
+                terms.add(t.lower().strip())
+
+        # Omit common words/articles from the search.
+        omit = ["the", "a", "an", "it", "cwe"]
+        terms = [t for t in terms if t.lower() not in omit and "cwe-" not in t.lower()]
+
         terms = list(terms)[:6]
         query += f"\nSearch terms: {', '.join(terms)}"
-        print(f"[VECTORDB QUERY: {query}]")
-        filter = {
-            "$and": [
-                {"abstraction": {"$ne": "class"}},
-                {"mapping": {"$ne": "Prohibited"}},
-                {"mapping": {"$ne": "Discouraged"}},
-            ]
-        }
-        result = client.query_texts(query, filter, n_results=n_results)
-        return result.get("documents")[0]
+
+        print(query)
+        return _search_cwe_db(client, query, n_results=n_results)
 
     @agent.tool_plain
     def get_cwe_details(cwe_id: int):
@@ -135,20 +136,7 @@ def agentic_demo(client: IEmbeddingClient):
         Returns:
             str|None: CWE data or nothing
         """
-        filter = {
-            "$and": [
-                {"abstraction": {"$ne": "class"}},
-                {"mapping": {"$ne": "Prohibited"}},
-                {"mapping": {"$ne": "Discouraged"}},
-                {"id": cwe_id},
-            ]
-        }
-        result = client.query_texts("", filter, n_results=1)
-        meta = result.get("metadatas")[0]
-        if len(meta) == 1:
-            return meta[0]
-        else:
-            return None
+        _get_cwe_details(client, cwe_id)
 
     query = input("Describe a vulnerability> ")
     user_prompt = (
@@ -163,3 +151,32 @@ def agentic_demo(client: IEmbeddingClient):
 
     response = agent.run_sync(user_prompt, output_type=RootCauseAnalysis, retries=3)
     print(response.output)
+
+
+def _get_cwe_details(client: IEmbeddingClient, cwe_id: int):
+    filter = {
+        "$and": [
+            {"abstraction": {"$ne": "class"}},
+            {"mapping": {"$ne": "Prohibited"}},
+            {"mapping": {"$ne": "Discouraged"}},
+            {"id": cwe_id},
+        ]
+    }
+    result = client.query_texts("", filter, n_results=1)
+    meta = result.get("metadatas")[0]
+    if len(meta) == 1:
+        return meta[0]
+    else:
+        return None
+
+
+def _search_cwe_db(client: IEmbeddingClient, query: str, n_results=3):
+    filter = {
+        "$and": [
+            {"abstraction": {"$ne": "class"}},
+            {"mapping": {"$ne": "Prohibited"}},
+            {"mapping": {"$ne": "Discouraged"}},
+        ]
+    }
+    result = client.query_texts(query, filter, n_results=n_results)
+    return result.get("documents")[0]
