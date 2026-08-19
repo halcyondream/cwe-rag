@@ -6,7 +6,6 @@ from config import Config
 from model import CweJsonModel
 import argparse
 from pathlib import Path
-import json
 from common import get_markdown
 
 
