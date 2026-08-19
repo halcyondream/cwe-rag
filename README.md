@@ -71,6 +71,16 @@ Describe your vulnerability> reflected cross-site scripting
 AgentRunResult(output=TopTwoPicks(top_cwe_id=79, secondary_cwe_id=81))
 ```
 
+Leverage a multi-agent demo with agent tools (stand-in for an MCP server):
+
+```
+python cwe_cli.py agentic
+
+Describe a vulnerability> reflected xss
+
+root_cause='The application fails to properly sanitize or encode untrusted input before including it in reflected responses, allowing an attacker to inject executable script that runs in victims’ browsers.' cwes=['CWE-79: Improper Neutralization of Script‑Related HTML Tags in a Web Page (Basic XSS)']
+```
+
 # Schema and Markdown frontmatter
 
 The CWE XML is transformed into an intermediary JSON schema. This schema
@@ -131,6 +141,13 @@ runs of the same query will yield different results. The string "reflected cross
 scripting" may wobble between CWE-81 and CWE-84, for example. In production, you
 may want to leverage LLM steps or agent patterns that "judge" the chosen output of
 more than one lookup and return a final, best set at the end.
+
+The RAG demos are not comprehensive. They are intended to cover basic use cases
+for vector database lookups in LLM or agent steps. The output is a proof of merit:
+that with necessary context, even small LLMs can perform root-cause mapping,
+provided they have the proper context (from the vector database). Contrast any
+of your vulnerability qureies against an "airgapped" (search-disabled) LLM or agent
+to evaluate the effectiveness of the RAG integration.
 
 # Example MD file
 
