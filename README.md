@@ -81,6 +81,21 @@ Describe a vulnerability> reflected xss
 root_cause='The application fails to properly sanitize or encode untrusted input before including it in reflected responses, allowing an attacker to inject executable script that runs in victims’ browsers.' cwes=['CWE-79: Improper Neutralization of Script‑Related HTML Tags in a Web Page (Basic XSS)']
 ```
 
+RAG example on lower-end or limited hardware:
+
+```
+LLM_MODEL="gemma4:e2b" python cwe_cli.py rag --no-structured-output 
+Describe your vulnerability> xss
+[LLM optimized: Cross-Site Scripting]
+**Top Two CWEs Describing the Root Cause:**
+
+1. **CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')**
+2. **CWE-80: Improper Neutralization of Script-Related HTML Tags in a Web Page (Basic XSS)**
+
+**Root Cause Description:**
+The root cause is the failure to properly encode or neutralize untrusted user input before it is rendered in a web page, allowing malicious script tags to be executed by the browser.
+```
+
 # Schema and Markdown frontmatter
 
 The CWE XML is transformed into an intermediary JSON schema. This schema

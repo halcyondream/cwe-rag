@@ -80,9 +80,9 @@ def rag_demo(client: IEmbeddingClient, n_results=6, structured_output=True):
 
     # query = _process_search_strings(query, result.output)
     query = result.output
-    print(query)
+    print(f"[LLM optimized: {query}]")
 
-    results = client.query_texts(query, filter, n_results=6)
+    results = client.query_texts(query, filter, n_results=n_results)
     documents = results.get("documents")[0]
     # metadata = results.get("metadatas")[0]
 
