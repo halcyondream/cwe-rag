@@ -40,7 +40,7 @@ def copy_md_files(include_prohibited=False, include_discouraged=False):
         md.copy(target_path)
 
 
-def query(client: IEmbeddingClient):
+def query(client: IEmbeddingClient, n_results=6):
     """
     Demoes a simple similarity search from the vector database.
     Omits PROHIBITED, DISCOURAGED, and Class CWEs.
@@ -54,7 +54,7 @@ def query(client: IEmbeddingClient):
             {"mapping": {"$ne": "Discouraged"}},
         ]
     }
-    results = client.query_texts(query, filter)
+    results = client.query_texts(query, filter, n_results=n_results)
 
     documents = results.get("documents")[0]
     metadata = results.get("metadatas")[0]
@@ -87,6 +87,22 @@ if __name__ == "__main__":
         default=False,
     )
     parser.add_argument(
+        "--no-structured-output",
+        help=(
+            "Inhibit structured output from RAG processing. "
+            "Useful for lower-end models."
+        ),
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
+        "--search-results",
+        help=("Number of search results to return from vectordb queries."),
+        nargs="?",
+        const=6,
+        type=int,
+    )
+    parser.add_argument(
         "--notransform",
         help="Any steps to omit from the pipeline",
         action="store_true",
@@ -111,6 +127,8 @@ if __name__ == "__main__":
         default=False,
     )
     args = parser.parse_args()
+    n_results = args.search_results
+    structured_output = not args.no_structured_output
 
     if not args.noextract:
         extractor = CweXmlExtractor(config)
@@ -135,10 +153,10 @@ if __name__ == "__main__":
         )
 
     elif args.mode == "query":
-        query(client)
+        query(client, n_results)
 
     elif args.mode == "rag":
-        rag_demo(client)
+        rag_demo(client, n_results=n_results, structured_output=structured_output)
 
     elif args.mode == "agentic":
         agentic_demo(client)

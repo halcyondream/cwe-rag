@@ -3,7 +3,7 @@ import os
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import Agent, ModelSettings, RunContext
 
 from load import IEmbeddingClient
 
@@ -16,7 +16,9 @@ path = os.environ.get("LLM_API_PATH")
 os.environ["OLLAMA_BASE_URL"] = f"{host}{path}"
 
 llm_model = os.environ.get("LLM_MODEL")
-model = f"ollama:{llm_model}"
+llm_provider = os.environ.get("LLM_PROVIDER")
+
+model = f"{llm_provider}:{llm_model}"
 
 
 class TopTwoPicks(BaseModel):
@@ -45,7 +47,13 @@ class RootCauseAnalysis(BaseModel):
     top_cwes: TopTwoPicks
 
 
-def rag_demo(client: IEmbeddingClient):
+def rag_demo(client: IEmbeddingClient, n_results=6, structured_output=True):
+    agent = Agent(
+        model,
+        instructions="You are a helpful vulnerability triage assistant.",
+        retries=3,
+        model_settings=ModelSettings(temperature=0.3),
+    )
     filter = {
         "$and": [
             {"abstraction": {"$ne": "class"}},
@@ -55,24 +63,42 @@ def rag_demo(client: IEmbeddingClient):
     }
     client.initialize()
     query = input("Describe your vulnerability> ")
-    results = client.query_texts(query, filter)
+
+    user_prompt_searchstrings = (
+        "Briefly summarize the following vulnerability without further explanation:\n"
+        f"{query}"
+    )
+
+    # Transform the vulnerability scenario/description into a search-friendly
+    # statement
+    if structured_output:
+        result = agent.run_sync(
+            user_prompt_searchstrings, retries=3, output_type=SearchStrings
+        )
+    else:
+        result = agent.run_sync(user_prompt_searchstrings, retries=3)
+
+    # query = _process_search_strings(query, result.output)
+    query = result.output
+    print(query)
+
+    results = client.query_texts(query, filter, n_results=6)
     documents = results.get("documents")[0]
     # metadata = results.get("metadatas")[0]
 
     user_prompt = (
-        "Select the top two CWEs that describe the root cause of this vulnerability.\n"
-        "Then, briefly describe the root cause in one sentence."
+        "Select the top two CWEs that describe the root cause of this <vulnerability>.\n"
+        "Then, briefly describe the root cause in one sentence.\n"
     )
-    user_prompt += f"\n<cwes>\n{json.dumps(documents)}\n</cwes>\nMost related CWEs:\n"
+    user_prompt += f"<vulnerability>\n{query}\n</vulnerability>\n"
+    user_prompt += f"\n<cwes>\n{json.dumps(documents)}\n</cwes>\n"
+    user_prompt += "\nMost related CWEs:\n"
 
-    agent = Agent(
-        model,
-        instructions="You are a helpful vulnerability triage agent.",
-        output_type=RootCauseAnalysis,
-        retries=3
-    )
+    if structured_output:
+        answer = agent.run_sync(user_prompt, retries=3, output_type=RootCauseAnalysis)
+    else:
+        answer = agent.run_sync(user_prompt, retries=3)
 
-    answer = agent.run_sync(user_prompt)
     print(answer.output)
 
 
@@ -151,6 +177,26 @@ def agentic_demo(client: IEmbeddingClient):
 
     response = agent.run_sync(user_prompt, output_type=RootCauseAnalysis, retries=3)
     print(response.output)
+
+
+def _process_search_strings(query: str, search_strings: SearchStrings):
+    # The agent may yield a list of space-separated terms.
+    # Break this apart into a list of up to six single words.
+    terms = set()
+
+    SearchStrings.model_validate(search_strings, strict=True)
+
+    for term in search_strings.terms:
+        for t in term.split(" "):
+            terms.add(t.lower().strip())
+
+    # Omit common words/articles from the search.
+    omit = ["the", "a", "an", "it", "cwe"]
+    terms = [t for t in terms if t.lower() not in omit and "cwe-" not in t.lower()]
+
+    terms = list(terms)[:6]
+    query += f"\nSearch terms: {', '.join(terms)}"
+    return query
 
 
 def _get_cwe_details(client: IEmbeddingClient, cwe_id: int):

@@ -30,7 +30,7 @@ class PlatformInfoModel(BaseModel):
     is_technology_specific: bool = Field(
         description="A heuristic from the platform info.", default=False
     )
-    architecturees: list[str] = Field(
+    architectures: list[str] = Field(
         description="A list of related architectures", default=[]
     )
     is_architecture_specific: bool = Field(
