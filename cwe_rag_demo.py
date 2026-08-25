@@ -1,7 +1,9 @@
 import json
 import os
 
+import jinja2
 from dotenv import load_dotenv
+from jinja2.sandbox import ImmutableSandboxedEnvironment
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, ModelSettings, RunContext
 
@@ -47,12 +49,20 @@ class RootCauseAnalysis(BaseModel):
     top_cwes: TopTwoPicks
 
 
-def rag_demo(client: IEmbeddingClient, n_results=6, structured_output=True):
+def rag_demo(
+    client: IEmbeddingClient,
+    n_results=6,
+    structured_output=True,
+    llm_make_searchable=True,
+):
+    env = ImmutableSandboxedEnvironment(
+        loader=jinja2.FileSystemLoader("prompts"), undefined=jinja2.StrictUndefined
+    )
     agent = Agent(
         model,
         instructions="You are a helpful vulnerability triage assistant.",
         retries=3,
-        model_settings=ModelSettings(temperature=0.3),
+        model_settings=ModelSettings(temperature=0.0),
     )
     filter = {
         "$and": [
@@ -64,40 +74,52 @@ def rag_demo(client: IEmbeddingClient, n_results=6, structured_output=True):
     client.initialize()
     query = input("Describe your vulnerability> ")
 
-    user_prompt_searchstrings = (
-        "Briefly summarize the following vulnerability without further explanation:\n"
-        f"{query}"
-    )
+    insructions_searchstrings = env.get_template(
+        "demo-rag/search-terms/system.jinja"
+    ).render()
+    user_prompt_searchstrings = env.get_template(
+        "demo-rag/search-terms/user.jinja"
+    ).render(vulnerability=query)
 
     # Transform the vulnerability scenario/description into a search-friendly
     # statement
-    if structured_output:
-        result = agent.run_sync(
-            user_prompt_searchstrings, retries=3, output_type=SearchStrings
-        )
-    else:
-        result = agent.run_sync(user_prompt_searchstrings, retries=3)
+    if llm_make_searchable:
+        if structured_output:
+            # Transform and parse a SearchStrings object.
+            result = agent.run_sync(
+                user_prompt_searchstrings, retries=3, output_type=SearchStrings
+            )
+        else:
+            # Use output without generating/parsing search strings.
+            result = agent.run_sync(
+                user_prompt_searchstrings,
+                retries=3,
+                instructions=insructions_searchstrings,
+            )
 
-    # query = _process_search_strings(query, result.output)
-    query = result.output
-    print(f"[LLM optimized: {query}]")
+        phrases = result.output
+        print(phrases)
+        query = ", ".join(json.loads(phrases))
+        print(f"[LLM optimized: {query}]")
+
+    else:
+        print("[No LLM optimization. Using query as-is...]")
 
     results = client.query_texts(query, filter, n_results=n_results)
     documents = results.get("documents")[0]
-    # metadata = results.get("metadatas")[0]
+    metadata = results.get("metadatas")[0]
 
-    user_prompt = (
-        "Select the top two CWEs that describe the root cause of this <vulnerability>.\n"
-        "Then, briefly describe the root cause in one sentence.\n"
+    print(f"[CWEs Found: {[meta["cwe_id"] for meta in metadata]}]")
+
+    instructions = env.get_template("demo-rag/judge/system.jinja").render()
+    user_prompt = env.get_template("demo-rag/judge/user.jinja").render(
+        vulnerability=query, cwes=documents
     )
-    user_prompt += f"<vulnerability>\n{query}\n</vulnerability>\n"
-    user_prompt += f"\n<cwes>\n{json.dumps(documents)}\n</cwes>\n"
-    user_prompt += "\nMost related CWEs:\n"
 
     if structured_output:
         answer = agent.run_sync(user_prompt, retries=3, output_type=RootCauseAnalysis)
     else:
-        answer = agent.run_sync(user_prompt, retries=3)
+        answer = agent.run_sync(user_prompt, retries=3, instructions=instructions)
 
     print(answer.output)
 

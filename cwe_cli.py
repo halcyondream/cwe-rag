@@ -100,7 +100,17 @@ if __name__ == "__main__":
         help=("Number of search results to return from vectordb queries."),
         nargs="?",
         const=6,
+        default=6,
         type=int,
+    )
+    parser.add_argument(
+        "--no-transform-query",
+        help=(
+            "Inhibit query transformation from RAG processing. "
+            "Useful if you want to use the raw query against the vectordb."
+        ),
+        action="store_true",
+        default=False,
     )
     parser.add_argument(
         "--notransform",
@@ -129,6 +139,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     n_results = args.search_results
     structured_output = not args.no_structured_output
+    llm_transform_query = not args.no_transform_query
 
     if not args.noextract:
         extractor = CweXmlExtractor(config)
@@ -156,7 +167,12 @@ if __name__ == "__main__":
         query(client, n_results)
 
     elif args.mode == "rag":
-        rag_demo(client, n_results=n_results, structured_output=structured_output)
+        rag_demo(
+            client,
+            n_results=n_results,
+            structured_output=structured_output,
+            llm_make_searchable=llm_transform_query,
+        )
 
     elif args.mode == "agentic":
         agentic_demo(client)

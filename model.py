@@ -12,7 +12,7 @@ class PlatformInfoModel(BaseModel):
     shortcomings.
     """
 
-    langauges: list[str] = Field(
+    languages: list[str] = Field(
         description="A list of related programming languages", default=[]
     )
     is_language_specific: bool = Field(
@@ -68,6 +68,25 @@ class CveModel(BaseModel):
     cve_description: str = Field(description="The CVE's description")
 
 
+class RelationshipModel(BaseModel):
+    """
+    CWE relationships describe how the current weakness relates to other
+    weaknesses.
+
+    The relationship MUST have one of the optional fields and the related
+    view. The view is only sometimes necessary in practice, but is required
+    here.
+    """
+
+    can_also_be: int | None = None
+    child_of: int | None = None
+    can_precede: int | None = None
+    peer_of: int | None = None
+    requires: int | None = None
+    starts_with: int | None = None
+    view: int
+
+
 class CweJsonModel(BaseModel):
     """
     This schema captures key information about a CWE.
@@ -80,9 +99,9 @@ class CweJsonModel(BaseModel):
     mapping: Literal["Allowed", "Allowed-with-Review", "Discouraged", "Prohibited"] = (
         Field(description="Whether the CWE can be mapped to real-world vulnerabilities")
     )
-    abstraction: Literal["Variant", "Base", "Compound", "Class", "Category"] = Field(
-        description="The CWE's abstraction level (base and variant preferred)"
-    )
+    abstraction: Literal[
+        "Variant", "Base", "Compound", "Class", "Category", "Pillar"
+    ] = Field(description="The CWE's abstraction level (base and variant preferred)")
     description: str = Field(description="The weakness' brief description")
     extended_description: str = Field(
         description="An optional extended description of the weakness", default=""
@@ -103,6 +122,12 @@ class CweJsonModel(BaseModel):
     )
     consequences: list[ConsequenceModel] = Field(
         description="Any impacts associated with this weakness"
+    )
+    relationships: list[RelationshipModel] = Field(
+        description="Any relationships to this CWE", default=[]
+    )
+    parent_views: list[int] = Field(
+        description="Any views that organize this CWE", default=[]
     )
 
 

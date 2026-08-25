@@ -29,8 +29,8 @@ class CweXmlExtractor(IHook):
         config: Config,
         output_folder=None,
         cache_folder=None,
-        ignore_prohibited=True,
-        ignore_discouraged=True,
+        ignore_prohibited=False,
+        ignore_discouraged=False,
     ):
         self.config = config
         self.ignore_prohibited = ignore_prohibited
@@ -220,6 +220,8 @@ class CweXmlExtractor(IHook):
             "is_architecture_specific": cwe_is_architecture_specific,
         }
 
+        relationships, views = self._parse_relationships(cwe_json)
+
         cwe_metadata = {
             "id": cwe_id,
             "name": cwe_name,
@@ -232,12 +234,53 @@ class CweXmlExtractor(IHook):
             "capecs": related_capecs,
             "platform_info": cwe_platform_metadata,
             "consequences": consequences,
+            "relationships": relationships,
+            "parent_views": views,
         }
 
-        CweJsonModel.model_validate(cwe_metadata, strict=True)
+        CweJsonModel.model_validate(cwe_metadata, extra="forbid", strict=True)
 
         with open(self.output_folder / f"cwe-{cwe_id}.json", "w") as f:
             f.write(json.dumps(cwe_metadata, indent=2))
+
+    def _parse_relationships(self, cwe_json):
+        def get_edge(relationships):
+            natures = {
+                "CanAlsoBe": "can_also_be",
+                "ChildOf": "child_of",
+                "CanPrecede": "can_precede",
+                "PeerOf": "peer_of",
+                "Requires": "requires",
+                "StartsWith": "starts_with",
+            }
+            view = relationships["@View_ID"]
+            nature = natures[relationships["@Nature"]]
+            to_cwe = relationships["@CWE_ID"]
+            edge = {nature: int(to_cwe), "view": int(view)}
+            return edge
+
+        edges = []
+
+        relationships = cwe_json.get("Related_Weaknesses")
+
+        if not relationships:
+            print(f"  [CWE-{cwe_json['@ID']} has no relationships]")
+            return [], []
+
+        if relationships.get("Related_Weakness"):
+            relationships = relationships["Related_Weakness"]
+
+        if type(relationships) == list:
+            for relation in relationships:
+                edge = get_edge(relation)
+                edges.append(edge)
+        elif type(relationships) == dict:
+            edge = get_edge(relationships)
+            edges.append(edge)
+
+        views = {e["view"] for e in edges}
+
+        return edges, list(views)
 
     def _handle_platform_collection(self, platform_info: dict, name: str, not_key: str):
         """

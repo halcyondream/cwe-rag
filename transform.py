@@ -55,7 +55,7 @@ class CweJsonToMarkdownTransformer(IHook):
                 data = json.load(f)
 
             if validate:
-                CweJsonModel.model_validate(data, strict=True)
+                CweJsonModel.model_validate(data, extra="forbid", strict=True)
 
             md_template = Template(cwe_template)
 

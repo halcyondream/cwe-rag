@@ -153,7 +153,9 @@ class CweMarkdownLoader(IHook):
                 topmatter, cwe_md = self._extract_markdown(content)
 
             if validate:
-                self.config.validation_model.model_validate(topmatter, strict=True)
+                self.config.validation_model.model_validate(
+                    topmatter, extra="forbid", strict=True
+                )
 
             cwe_id = topmatter["id"]
             cwe_name = topmatter["name"]
