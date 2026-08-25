@@ -68,14 +68,15 @@ class CveModel(BaseModel):
     cve_description: str = Field(description="The CVE's description")
 
 
+from pydantic import BaseModel, model_validator
+
+
 class RelationshipModel(BaseModel):
     """
     CWE relationships describe how the current weakness relates to other
     weaknesses.
 
-    The relationship MUST have one of the optional fields and the related
-    view. The view is only sometimes necessary in practice, but is required
-    here.
+    At least one relationship type and the related view are required.
     """
 
     can_also_be: int | None = None
@@ -85,6 +86,23 @@ class RelationshipModel(BaseModel):
     requires: int | None = None
     starts_with: int | None = None
     view: int
+
+    @model_validator(mode="after")
+    def require_relationship_type(self):
+        """
+        Only one of these fields must describe the relationship.
+        """
+        relationship_type = (
+            self.can_also_be,
+            self.child_of,
+            self.can_precede,
+            self.peer_of,
+            self.requires,
+            self.starts_with,
+        )
+        if sum(value is not None for value in relationship_type) != 1:
+            raise ValueError("At least one relationship type must be specified")
+        return self
 
 
 class CweJsonModel(BaseModel):
