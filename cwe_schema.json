@@ -67,13 +67,13 @@
     "PlatformInfoModel": {
       "description": "Platform information is derived from the weakness itself.\nThe CWE documentation often leaves these fields empty or even ambiguous.\nAn LLM classification step may be desirable to enrich or supplement these\nshortcomings.",
       "properties": {
-        "langauges": {
+        "languages": {
           "default": [],
           "description": "A list of related programming languages",
           "items": {
             "type": "string"
           },
-          "title": "Langauges",
+          "title": "Languages",
           "type": "array"
         },
         "is_language_specific": {
@@ -112,13 +112,13 @@
           "title": "Is Technology Specific",
           "type": "boolean"
         },
-        "architecturees": {
+        "architectures": {
           "default": [],
           "description": "A list of related architectures",
           "items": {
             "type": "string"
           },
-          "title": "Architecturees",
+          "title": "Architectures",
           "type": "array"
         },
         "is_architecture_specific": {
@@ -129,6 +129,92 @@
         }
       },
       "title": "PlatformInfoModel",
+      "type": "object"
+    },
+    "RelationshipModel": {
+      "description": "CWE relationships describe how the current weakness relates to other\nweaknesses.\n\nAt least one relationship type and the related view are required.",
+      "properties": {
+        "can_also_be": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Can Also Be"
+        },
+        "child_of": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Child Of"
+        },
+        "can_precede": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Can Precede"
+        },
+        "peer_of": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Peer Of"
+        },
+        "requires": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Requires"
+        },
+        "starts_with": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Starts With"
+        },
+        "view": {
+          "title": "View",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "view"
+      ],
+      "title": "RelationshipModel",
       "type": "object"
     }
   },
@@ -162,7 +248,8 @@
         "Base",
         "Compound",
         "Class",
-        "Category"
+        "Category",
+        "Pillar"
       ],
       "title": "Abstraction",
       "type": "string"
@@ -212,6 +299,24 @@
         "$ref": "#/$defs/ConsequenceModel"
       },
       "title": "Consequences",
+      "type": "array"
+    },
+    "relationships": {
+      "default": [],
+      "description": "Any relationships to this CWE",
+      "items": {
+        "$ref": "#/$defs/RelationshipModel"
+      },
+      "title": "Relationships",
+      "type": "array"
+    },
+    "parent_views": {
+      "default": [],
+      "description": "Any views that organize this CWE",
+      "items": {
+        "type": "integer"
+      },
+      "title": "Parent Views",
       "type": "array"
     }
   },

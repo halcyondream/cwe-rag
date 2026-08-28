@@ -4,7 +4,9 @@ Briefly summarize the root cause of the <vulnerability> in one sentence or phras
 
 # Response format
 
-Your answer must be a JSON Array containing short phrases of all root causes.
+If a schema is provided, use the schema.
+
+Otherwise, your answer must be a JSON Array containing short phrases of all root causes.
 
 [ 
     "root cause phrase", 
@@ -19,8 +21,13 @@ Your answer must be a JSON Array containing short phrases of all root causes.
 - Return the output as a Python array containing short phrases.
 - Try to determine one or two root cause phrases.
 - Focus only on what the vulnerability is KNOWN to do based on the description.
-- If any specific proper names, including variable or parameter names, exist in
-  the report, omit them from your answer.
+- If the root cause is an 
+- If a proper name implies a generic form, such as "url parameter" or "variable":
+    - Include the generic form in your answer
+- If your answer includes any proper names, such as the names of parameters or
+  fields or variables:
+    - Omit this data.
+- Otherwise, consider it for your summary.
 
 # Step by step workflow
 
@@ -40,7 +47,7 @@ Your answer must be a JSON Array containing short phrases of all root causes.
 
 User: stored xss in query parameter foo_param
 Answer: [
-    "stored cross-site scripting (xss) injected in query parameter `user_name`",
+    "stored cross-site scripting (xss) injected in query parameter",
     "weak input validation in query parameter"
 ]
 

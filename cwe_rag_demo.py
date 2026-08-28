@@ -31,8 +31,14 @@ class TopTwoPicks(BaseModel):
     top_cwe_id: int = Field(
         description="The top CWE from the list that relates to the vulnerability"
     )
+    top_reason: str = Field(
+        description="A brief reason why this CWE was chosen."
+    )
     secondary_cwe_id: int = Field(
         description="Another candidate CWE from the list that relates to the vulnerability"
+    )
+    secondary_reason: str = Field(
+        description="A brief reason why this CWE was chosen."
     )
 
 
@@ -67,12 +73,15 @@ def rag_demo(
     filter = {
         "$and": [
             {"abstraction": {"$ne": "class"}},
+            {"abstraction": {"$ne": "Variant"}},
             {"mapping": {"$ne": "Prohibited"}},
             {"mapping": {"$ne": "Discouraged"}},
+            {"parent_views": {"$contains": 1000}}
         ]
     }
     client.initialize()
     query = input("Describe your vulnerability> ")
+    orig_query = query
 
     insructions_searchstrings = env.get_template(
         "demo-rag/search-terms/system.jinja"
@@ -87,8 +96,12 @@ def rag_demo(
         if structured_output:
             # Transform and parse a SearchStrings object.
             result = agent.run_sync(
-                user_prompt_searchstrings, retries=3, output_type=SearchStrings
+                user_prompt_searchstrings,
+                retries=3,
+                instructions=insructions_searchstrings,
+                output_type=SearchStrings,
             )
+            query = result.output.terms
         else:
             # Use output without generating/parsing search strings.
             result = agent.run_sync(
@@ -96,33 +109,57 @@ def rag_demo(
                 retries=3,
                 instructions=insructions_searchstrings,
             )
-
-        phrases = result.output
-        print(phrases)
-        query = ", ".join(json.loads(phrases))
+            query = list(json.loads(result.output))
+        print(f"[search usage: {result.usage}]")
         print(f"[LLM optimized: {query}]")
 
     else:
         print("[No LLM optimization. Using query as-is...]")
 
-    results = client.query_texts(query, filter, n_results=n_results)
-    documents = results.get("documents")[0]
-    metadata = results.get("metadatas")[0]
+    _prepend = "Represent this sentence for searching relevant passages:\n"
 
-    print(f"[CWEs Found: {[meta["cwe_id"] for meta in metadata]}]")
+    results = client.query_texts([_prepend + q for q in query], filter, n_results=n_results)
+    documents = results.get("documents")
+    metadata = results.get("metadatas")
 
-    instructions = env.get_template("demo-rag/judge/system.jinja").render()
-    user_prompt = env.get_template("demo-rag/judge/user.jinja").render(
-        vulnerability=query, cwes=documents
-    )
+    # The ChromaDB query returns docs and metadatas for each string in
+    # the query, but we test assumptions anyway.
+    assert len(documents) == len(metadata) == len(query)
 
-    if structured_output:
-        answer = agent.run_sync(user_prompt, retries=3, output_type=RootCauseAnalysis)
-    else:
-        answer = agent.run_sync(user_prompt, retries=3, instructions=instructions)
+    for i in range(len(documents)):
+        #docs = documents[i]
+        metas = metadata[i]
+        q = query[i]
+        cwe_data = []
 
-    print(answer.output)
+        for m in metas:
+            id = m["cwe_id"]
+            name = m["name"]
+            desc = m["description"]
+            label = f"- CWE-{id}: {name}. {desc}"
+            cwe_data.append(label)
 
+        print(f"[CWEs Found: {[meta["cwe_id"] for meta in metas]}]")
+
+        instructions = env.get_template("demo-rag/judge/system.jinja").render()
+        user_prompt = env.get_template("demo-rag/judge/user.jinja").render(
+            weakness=q, cwes=cwe_data, report=orig_query
+        )
+
+        if structured_output:
+            answer = agent.run_sync(
+                user_prompt,
+                retries=3,
+                instructions=instructions,
+                output_type=RootCauseAnalysis,
+            )
+            answer = answer.output.model_dump_json(indent=2)
+        else:
+            answer = agent.run_sync(user_prompt, retries=3, instructions=instructions)
+
+        print(f"[judge usage: {answer.usage}]")
+        print(f"[from {q}]")
+        print(answer.output + "\n\n---\n\n")
 
 def agentic_demo(client: IEmbeddingClient):
     client.initialize()

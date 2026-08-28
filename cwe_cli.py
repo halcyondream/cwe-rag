@@ -50,8 +50,10 @@ def query(client: IEmbeddingClient, n_results=6):
     filter = {
         "$and": [
             {"abstraction": {"$ne": "class"}},
+            {"abstraction": {"$ne": "Variant"}},
             {"mapping": {"$ne": "Prohibited"}},
             {"mapping": {"$ne": "Discouraged"}},
+            {"parent_views": {"$contains": 1003}}
         ]
     }
     results = client.query_texts(query, filter, n_results=n_results)

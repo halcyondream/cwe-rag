@@ -77,7 +77,9 @@ class OllamaChromaEmbeddingClient(IEmbeddingClient):
         )
 
     def get_chunks(self, document):
-        return self.splitter.split_text(document)
+        chunks = self.splitter.split_text(document)
+        print(len(chunks))
+        return chunks
 
     def add_document_chunked(self, document, doc_idx, metadata: dict | None = None):
         """
@@ -90,9 +92,11 @@ class OllamaChromaEmbeddingClient(IEmbeddingClient):
             else:
                 self._add_chunk(chunk, doc_idx, chunk_idx)
 
-    def query_texts(self, query: str, filter: dict, n_results=6):
+    def query_texts(self, query: str | list, filter: dict, n_results=6):
+        if type(query) == str:
+            query = [query]
         return self.collection.query(
-            query_texts=[query], n_results=n_results, where=filter
+            query_texts=query, n_results=n_results, where=filter
         )
 
     def _add_chunk(self, chunk, doc_idx, chunk_idx):
@@ -162,6 +166,7 @@ class CweMarkdownLoader(IHook):
             cwe_abstraction = topmatter["abstraction"]
             cwe_description = topmatter["description"]
             cwe_mapping = topmatter["mapping"]
+            cwe_views = topmatter["parent_views"]
 
             cwe_consequences = self._parse_consequences(topmatter["consequences"])
 
@@ -179,6 +184,7 @@ class CweMarkdownLoader(IHook):
                 "abstraction": cwe_abstraction,
                 "mapping": cwe_mapping,
                 "description": cwe_description,
+                "parent_views": cwe_views if len(cwe_views) else [-1]
             }
 
             self.client.add_document_chunked(cwe_md, doc_idx, metadata=metadatas)
