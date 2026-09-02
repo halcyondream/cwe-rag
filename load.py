@@ -25,20 +25,29 @@ class IEmbeddingClient(ABC):
         """
         Initialize the data store.
         """
-
+    
+    @abstractmethod
     def get_chunks(self, document):
         """
         Represent a text document as a list of vector chunks.
         """
 
+    @abstractmethod
     def add_document_chunked(self, document, doc_idx, metadata: dict | None = None):
         """
         Add a document to the data store in its chunked form.
         """
 
+    @abstractmethod
     def query_texts(self, query: str, filter: dict, n_results=6):
         """
         Perform a similarity search of documents based on your query.
+        """
+
+    @abstractmethod
+    def get_by_metadata(self, filter, n_results=1):
+        """
+        Perform a metadata-only search.
         """
 
 
@@ -78,7 +87,6 @@ class OllamaChromaEmbeddingClient(IEmbeddingClient):
 
     def get_chunks(self, document):
         chunks = self.splitter.split_text(document)
-        print(len(chunks))
         return chunks
 
     def add_document_chunked(self, document, doc_idx, metadata: dict | None = None):
@@ -97,6 +105,12 @@ class OllamaChromaEmbeddingClient(IEmbeddingClient):
             query = [query]
         return self.collection.query(
             query_texts=query, n_results=n_results, where=filter
+        )
+
+    def get_by_metadata(self, filter, n_results=1):
+        return self.collection.get(
+            where=filter,
+            limit=n_results
         )
 
     def _add_chunk(self, chunk, doc_idx, chunk_idx):

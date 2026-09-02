@@ -35,15 +35,15 @@ If a schema is provided, use it.
 Otherwise, your answer should take only the following structure:
 
 {
-    "root cause": "<explanation of root cause>",
+    "root_cause": "<explanation of root cause>",
     "best_cwes": [
         {
-            "id": "CWE-<n>",
-            "reason": "<reason why this was chosen>"
+            "cwe_id": <cwe id n, as integer>,
+            "reason": "<reason why this cwe was chosen>"
         },
         {
-            "id": "CWE-<m>",
-            "reason": "<reason why this was chosen>"
+            "cwe_id": <cwe id m, as integer>,
+            "reason": "<reason why this cwe was chosen>"
         }
     ]
 }

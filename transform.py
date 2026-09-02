@@ -47,7 +47,7 @@ class CweJsonToMarkdownTransformer(IHook):
                 f"JSON folder {self.json_folder.absolute()} has no valid JSON files"
             )
 
-        with open("cwe_template.jinja") as f:
+        with open("templates/cwe_template.jinja") as f:
             cwe_template = f.read()
 
         for file in files:

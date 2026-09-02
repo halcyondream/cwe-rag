@@ -1,11 +1,15 @@
 import json
 import os
+import re
+from pathlib import Path
 
 import jinja2
 from dotenv import load_dotenv
 from jinja2.sandbox import ImmutableSandboxedEnvironment
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, ModelSettings, RunContext
+from rich.console import Console
+from rich.markdown import Markdown
 
 from load import IEmbeddingClient
 
@@ -62,7 +66,7 @@ def rag_demo(
     llm_make_searchable=True,
 ):
     env = ImmutableSandboxedEnvironment(
-        loader=jinja2.FileSystemLoader("prompts"), undefined=jinja2.StrictUndefined
+        loader=jinja2.FileSystemLoader("templates/demo-rag"), undefined=jinja2.StrictUndefined
     )
     agent = Agent(
         model,
@@ -84,10 +88,10 @@ def rag_demo(
     orig_query = query
 
     insructions_searchstrings = env.get_template(
-        "demo-rag/search-terms/system.jinja"
+        "search-terms/system.jinja"
     ).render()
     user_prompt_searchstrings = env.get_template(
-        "demo-rag/search-terms/user.jinja"
+        "search-terms/user.jinja"
     ).render(vulnerability=query)
 
     # Transform the vulnerability scenario/description into a search-friendly
@@ -126,6 +130,8 @@ def rag_demo(
     # the query, but we test assumptions anyway.
     assert len(documents) == len(metadata) == len(query)
 
+    analysis = []
+
     for i in range(len(documents)):
         #docs = documents[i]
         metas = metadata[i]
@@ -139,10 +145,13 @@ def rag_demo(
             label = f"- CWE-{id}: {name}. {desc}"
             cwe_data.append(label)
 
-        print(f"[CWEs Found: {[meta["cwe_id"] for meta in metas]}]")
+        cwe_ids_from_lookup = [meta["cwe_id"] for meta in metas]
 
-        instructions = env.get_template("demo-rag/judge/system.jinja").render()
-        user_prompt = env.get_template("demo-rag/judge/user.jinja").render(
+        print(f"[from {q}]")
+        print(f"[CWEs Found: {cwe_ids_from_lookup}]")
+
+        instructions = env.get_template("judge/system.jinja").render()
+        user_prompt = env.get_template("judge/user.jinja").render(
             weakness=q, cwes=cwe_data, report=orig_query
         )
 
@@ -158,8 +167,51 @@ def rag_demo(
             answer = agent.run_sync(user_prompt, retries=3, instructions=instructions)
 
         print(f"[judge usage: {answer.usage}]")
-        print(f"[from {q}]")
-        print(answer.output + "\n\n---\n\n")
+        output_raw = ""
+
+        for line in answer.output.split("\n"):
+            output_raw += re.sub(r"^```.*$", "", line)
+
+        try:
+            output = json.loads(output_raw.strip())
+            assert type(output) == dict
+            assert output.get("root_cause") != None
+            assert len(output.get("best_cwes")) > 0 and len(output.get("best_cwes")) < 3
+            for cwe in output.get("best_cwes"):
+                id = int(cwe["cwe_id"])
+                assert type(id) == int
+                assert id in cwe_ids_from_lookup
+
+        except Exception as e:
+            print(f"[output validation failure: {e}\n{output_raw.strip()}]")
+            continue
+
+        analysis.append(output)
+
+    root_causes = []
+    cwe_labels = []
+
+    for a in analysis:
+        root_cause = a["root_cause"]
+        root_causes.append(root_cause)
+        cwes = a["best_cwes"]
+
+        for cwe in cwes:
+            id = cwe["cwe_id"]
+            reason = cwe["reason"]
+            _lookup = client.get_by_metadata({"cwe_id": id}, n_results=1)
+            name = _lookup.get("metadatas")[0]["name"]
+            label = f"**CWE-{id}: {name}** - {reason}"
+            cwe_labels.append(label)
+
+    report_template = env.get_template("report.jinja")
+    report = report_template.render(
+        report=orig_query,
+        root_causes=root_causes,
+        cwes=cwe_labels
+    )
+    Console(width=80).print(Markdown(report))
+
 
 def agentic_demo(client: IEmbeddingClient):
     client.initialize()
